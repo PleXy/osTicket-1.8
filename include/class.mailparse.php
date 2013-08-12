@@ -146,13 +146,13 @@ class Mail_Parse {
     function getBody(){
 
         $body='';
-        if(!($body=$this->getPart($this->struct,'text/plain'))) {
-            if(($body=$this->getPart($this->struct,'text/html'))) {
-                //Cleanup the html.
-                $body=str_replace("</DIV><DIV>", "\n", $body);
-                $body=str_replace(array("<br>", "<br />", "<BR>", "<BR />"), "\n", $body);
-                $body=Format::safe_html($body); //Balance html tags & neutralize unsafe tags.
-            }
+        if($body=$this->getPart($this->struct,'text/plain'))
+            $body = Format::htmlchars($body);
+        elseif($body=$this->getPart($this->struct,'text/html')) {
+            //Cleanup the html.
+            $body=str_replace("</DIV><DIV>", "\n", $body);
+            $body=str_replace(array("<br>", "<br />", "<BR>", "<BR />"), "\n", $body);
+            $body=Format::safe_html($body); //Balance html tags & neutralize unsafe tags.
         }
         return $body;
     }
@@ -202,8 +202,13 @@ class Mail_Parse {
             $file=array(
                     'name'  => $filename,
                     'type'  => strtolower($part->ctype_primary.'/'.$part->ctype_secondary),
-                    'data'  => $this->mime_encode($part->body, $part->ctype_parameters['charset'])
                     );
+
+            if ($part->ctype_parameters['charset'])
+                $file['data'] = $this->mime_encode($part->body,
+                    $part->ctype_parameters['charset']);
+            else
+                $file['data'] = $part->body;
 
             if(!$this->decode_bodies && $part->headers['content-transfer-encoding'])
                 $file['encoding'] = $part->headers['content-transfer-encoding'];
@@ -289,11 +294,15 @@ class EmailDataParser {
                 break;
             }
 
+            $data['email'] = $from->mailbox.'@'.$from->host;
+
             $data['name'] = trim($from->personal,'"');
             if($from->comment && $from->comment[0])
                 $data['name'].= ' ('.$from->comment[0].')';
 
-            $data['email'] = $from->mailbox.'@'.$from->host;
+            //Use email address as name  when FROM address doesn't  have a name.
+            if(!$data['name'] && $data['email'])
+                $data['name'] = $data['email'];
         }
 
         //TO Address:Try to figure out the email address... associated with the incoming email.

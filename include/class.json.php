@@ -28,6 +28,10 @@ class JsonDataParser {
                 $contents .= fread($stream, 8192);
         } else
             $contents = $stream;
+        return self::decode($contents);
+    }
+
+    function decode($contents) {
         if (function_exists("json_decode")) {
             return json_decode($contents, true);
         } else {

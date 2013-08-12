@@ -21,7 +21,7 @@ function get_osticket_root_path() {
 function glob_recursive($pattern, $flags = 0) {
     $files = glob($pattern, $flags);
     foreach (glob(dirname($pattern).'/*', GLOB_ONLYDIR|GLOB_NOSORT) as $dir) {
-        $files = array_merge($files, 
+        $files = array_merge($files,
             glob_recursive($dir.'/'.basename($pattern), $flags));
     }
     return $files;
@@ -89,28 +89,29 @@ package("*.php", 'upload/');
 foreach (array('assets','css','images','js') as $dir)
     package("$dir/*", "upload/$dir", -1, "*less");
 
+# Load API
+package('api/{,.}*', 'upload/api');
+
 # Load the knowledgebase
 package("kb/*.php", "upload/kb");
 
 # Load the staff interface
 package("scp/*.php", "upload/scp/", -1);
 foreach (array('css','images','js') as $dir)
-    package("$dir/*", "upload/scp/$dir", -1);
+    package("scp/$dir/*", "upload/scp/$dir", -1);
 
 # Load in the scripts
 mkdir("$stage_path/scripts/");
 package("setup/scripts/*", "scripts/", -1, "*stage");
 
 # Load the heart of the system
-package("include/*.php", "upload/include", -1);
-# And the sql patches
-package("include/upgrader/*.sql", "upload/include/upgrader", -1);
+package("include/{,.}*", "upload/include", -1, array('*ost-config.php', '*.sw[a-z]'));
 
 # Include the installer
 package("setup/*.{php,txt}", "upload/setup", -1, array("*scripts","*test","*stage"));
 foreach (array('css','images','js') as $dir)
     package("setup/$dir/*", "upload/setup/$dir", -1);
-package("setup/inc/sql/*.{sql,md5}", "upload/setup/inc/sql", -1);
+package("setup/inc/streams/*.sql", "upload/setup/inc/streams", -1);
 
 # Load the license and documentation
 package("*.{txt,md}", "");
@@ -122,16 +123,17 @@ if(($mds = glob("$stage_path/*.md"))) {
 }
 
 # Make an archive of the stage folder
-$version_info = preg_grep('/THIS_VERSION/',
-    explode("\n", file_get_contents("$root/main.inc.php")));
-
-foreach ($version_info as $line)
-    eval($line);
+$version = exec('git describe');
 
 $pwd = getcwd();
 chdir($stage_path);
-shell_exec("tar cjf '$pwd/osticket-".THIS_VERSION.".tar.bz2' *");
-shell_exec("zip -r '$pwd/osticket-".THIS_VERSION.".zip' *");
+
+// Replace THIS_VERSION in the stage/ folder
+
+shell_exec("grep -rl \"define('THIS_VERSION'\" * | xargs sed -ri -e \"s/( *).*THIS_VERSION.*/\\1define('THIS_VERSION', '$version');/\"");
+
+shell_exec("tar cjf '$pwd/osTicket-$version.tar.bz2' *");
+shell_exec("zip -r '$pwd/osTicket-$version.zip' *");
 
 chdir($pwd);
 ?>

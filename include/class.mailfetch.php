@@ -181,7 +181,9 @@ class MailFetcher {
             $text=imap_binary($text);
             break;
             case 3:
-            $text=imap_base64($text);
+            // imap_base64 implies strict mode. If it refuses to decode the
+            // data, then fallback to base64_decode in non-strict mode
+            $text = (($conv=imap_base64($text))) ? $conv : base64_decode($text);
             break;
             case 4:
             $text=imap_qprint($text);
@@ -340,13 +342,15 @@ class MailFetcher {
     function getBody($mid) {
 
         $body ='';
-        if(!($body = $this->getPart($mid,'TEXT/PLAIN', $this->charset))) {
-            if(($body = $this->getPart($mid,'TEXT/HTML', $this->charset))) {
-                //Convert tags of interest before we striptags
-                $body=str_replace("</DIV><DIV>", "\n", $body);
-                $body=str_replace(array("<br>", "<br />", "<BR>", "<BR />"), "\n", $body);
-                $body=Format::safe_html($body); //Balance html tags & neutralize unsafe tags.
-            }
+        if ($body = $this->getPart($mid,'TEXT/PLAIN', $this->charset))
+            // The Content-Type was text/plain, so escape anything that
+            // looks like HTML
+            $body=Format::htmlchars($body);
+        elseif ($body = $this->getPart($mid,'TEXT/HTML', $this->charset)) {
+            //Convert tags of interest before we striptags
+            $body=str_replace("</DIV><DIV>", "\n", $body);
+            $body=str_replace(array("<br>", "<br />", "<BR>", "<BR />"), "\n", $body);
+            $body=Format::safe_html($body); //Balance html tags & neutralize unsafe tags.
         }
 
         return $body;
@@ -372,17 +376,21 @@ class MailFetcher {
 
         $emailId = $this->getEmailId();
         $vars = array();
-        $vars['name']=$this->mime_decode($mailinfo['name']);
         $vars['email']=$mailinfo['email'];
+        $vars['name']=$this->mime_decode($mailinfo['name']);
         $vars['subject']=$mailinfo['subject']?$this->mime_decode($mailinfo['subject']):'[No Subject]';
         $vars['message']=Format::stripEmptyLines($this->getBody($mid));
         $vars['header']=$this->getHeader($mid);
         $vars['emailId']=$emailId?$emailId:$ost->getConfig()->getDefaultEmailId(); //ok to default?
-        $vars['name']=$vars['name']?$vars['name']:$vars['email']; //No name? use email
         $vars['mid']=$mailinfo['mid'];
 
-        if(!$vars['message']) //An email with just attachments can have empty body.
-            $vars['message'] = '(EMPTY)';
+        //Missing FROM name  - use email address.
+        if(!$vars['name'])
+            $vars['name'] = $vars['email'];
+
+        //An email with just attachments can have empty body.
+        if(!$vars['message'])
+            $vars['message'] = '-';
 
         if($ost->getConfig()->useEmailPriority())
             $vars['priorityId']=$this->getPriority($mid);
@@ -423,7 +431,6 @@ class MailFetcher {
         if($message
                 && $ost->getConfig()->allowEmailAttachments()
                 && ($struct = imap_fetchstructure($this->mbox, $mid))
-                && $struct->parts
                 && ($attachments=$this->getAttachments($struct))) {
 
             foreach($attachments as $a ) {
@@ -541,7 +548,7 @@ class MailFetcher {
                         "\nHost: ".$fetcher->getHost().
                         "\nError: ".$fetcher->getLastError().
                         "\n\n ".$errors.' consecutive errors. Maximum of '.$MAXERRORS. ' allowed'.
-                        "\n\n This could be connection issues related to the mail server. Next delayed login attempt in aprox. $TIMEOUT minutes";
+                        "\n\n This could be connection issues related to the mail server. Next delayed login attempt in approx. $TIMEOUT minutes";
                     $ost->alertAdmin('Mail Fetch Failure Alert', $msg, true);
                 }
             }
