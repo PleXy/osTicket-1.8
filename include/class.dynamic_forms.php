@@ -17,6 +17,7 @@
     vim: expandtab sw=4 ts=4 sts=4:
 **********************************************************************/
 require_once(INCLUDE_DIR . 'class.orm.php');
+require_once(INCLUDE_DIR . 'class.forms.php');
 
 /**
  * Form template, used for designing the custom form and for entering custom
@@ -24,16 +25,15 @@ require_once(INCLUDE_DIR . 'class.orm.php');
  */
 class DynamicFormSection extends VerySimpleModel {
 
-    function __construct($row) {
-        parent::__construct($row);
-        $this->id = $row['id'];
-        $this->_errors = false;
-    }
+    static $meta = array(
+        'table' => DYNAMIC_FORM_SEC_TABLE,
+        'ordering' => array('title'),
+    );
 
     function getFields() {
         if (!$this->_fields) {
             $this->_fields = array();
-            foreach (DynamicFormField::find(array('section_id'=>$this->id)) as $f)
+            foreach (DynamicFormField::objects()->filter(array('section_id'=>$this->id)) as $f)
                 $this->_fields[] = $f->getImpl();
         }
         return $this->_fields;
@@ -41,12 +41,11 @@ class DynamicFormSection extends VerySimpleModel {
     function getTitle() { return $this->get('title'); }
     function getInstructions() { return $this->get('instructions'); }
 
-    function isValid() {
-        return !$this->_errors;
-    }
-
-    function errors() {
-        return $this->_errors;
+    function getForm() {
+        $fields = $this->getFields();
+        foreach ($fields as &$f)
+            $f = $f->getField();
+        return new Form($fields, $this->title, $this->instructions);
     }
 
     function instanciate() {
@@ -54,33 +53,20 @@ class DynamicFormSection extends VerySimpleModel {
             'section_id'=>$this->get('id'), 'sort'=>$this->get('sort')));
     }
 
-    function all($sort='title', $limit=false, $offset=false) {
-        return parent::all(get_class(), DYNAMIC_FORM_SEC_TABLE, $sort);
-    }
-
-    function count($where=false) {
-        return parent::count(get_class(), DYNAMIC_FORM_SEC_TABLE, $where);
-    }
-
-    function find($where, $sort='title', $limit=false, $offset=false) {
-        return parent::find(get_class(), DYNAMIC_FORM_SEC_TABLE, $where,
-            $sort, $limit, $offset);
-    }
-
-    function lookup($id) {
+    static function lookup($id) {
         return ($id && is_numeric($id)
-            && ($r=parent::lookup(get_class(), DYNAMIC_FORM_SEC_TABLE, array('id'=>$id)))
+            && ($r=parent::lookup(array('id'=>$id)))
             && $r->get('id')==$id)?$r:null;
     }
 
     function save() {
         if (count($this->dirty))
             $this->set('updated', new SqlFunction('NOW'));
-        return parent::save(DYNAMIC_FORM_SEC_TABLE, 'id', true);
+        return parent::save(true);
     }
 
-    function create($ht=false) {
-        $inst = parent::create(get_class(), $ht);
+    static function create($ht=false) {
+        $inst = parent::create($ht);
         $inst->set('created', new SqlFunction('NOW'));
         return $inst;
     }
@@ -89,6 +75,19 @@ class DynamicFormSection extends VerySimpleModel {
 require_once(INCLUDE_DIR . "class.json.php");
 
 class DynamicFormField extends VerySimpleModel {
+    
+    static $meta = array(
+        'table' => DYNAMIC_FORM_FIELD_TABLE,
+        'ordering' => array('sort'),
+        'pk' => array('id'),
+        'joins' => array(
+            'form' => array(
+                'type' => 'left',
+                'constraint' => array('form_id' => 'DynamicFormSection.id'),
+            ),
+            'sla' => array('sla_id' => 'Sla.id'),
+        ),
+    );
 
     /**
      * getClean
@@ -125,122 +124,7 @@ class DynamicFormField extends VerySimpleModel {
         return count($this->errors()) === 0;
     }
 
-    function isValidEntry() {
-        $this->validateEntry();
-        return count($this->_errors) == 0;
-    }
-
-    /**
-     * validateEntry
-     *
-     * Validates user entry on an instance of the field on a dynamic form.
-     * This is called when an instance of this field (like a TextboxField)
-     * receives data from the user and that value should be validated.
-     *
-     * Parameters:
-     * $value - (string) input from the user
-     */
-    function validateEntry($value) {
-        # Validates a user-input into an instance of this field on a dynamic
-        # form
-        if (!is_array($this->_errors)) {
-            $this->_errors = array();
-
-            if ($this->get('required') && !$value)
-                $this->_errors[] = $this->getLabel() . ' is a required field';
-        }
-    }
-
-    /**
-     * parse
-     *
-     * Used to transform user-submitted data to a PHP value. This value is
-     * not yet considered valid. The ::validateEntry() method will be called
-     * on the value to determine if the entry is valid. Therefore, if the
-     * data is clearly invalid, return something like NULL that can easily
-     * be deemed invalid in ::validateEntry(), however, can still produce a
-     * useful error message indicating what is wrong with the input.
-     */
-    function parse($value) {
-        return $value;
-    }
-
-    /**
-     * to_php
-     *
-     * Transforms the data from the value stored in the database to a PHP
-     * value. The ::to_database() method is used to produce the database
-     * valse, so this method is the compliment to ::to_database().
-     *
-     * Parameters:
-     * $value - (string or null) database representation of the field's
-     *      content
-     */
-    function to_php($value) {
-        return $value;
-    }
-
-    /**
-     * to_database
-     *
-     * Determines the value to be stored in the database. The database
-     * backend for all fields is a text field, so this method should return
-     * a text value or NULL to represent the value of the field. The
-     * ::to_php() method will convert this value back to PHP.
-     *
-     * Paremeters:
-     * $value - PHP value of the field's content
-     */
-    function to_database($value) {
-        return $value;
-    }
-
-    /**
-     * toString
-     *
-     * Converts the PHP value created in ::parse() or ::to_php() to a
-     * pretty-printed value to show to the user. This is especially useful
-     * for something like dates which are stored considerably different in
-     * the database from their respective human-friendly versions.
-     * Furthermore, this method allows for internationalization and
-     * localization.
-     *
-     * Parametes:
-     * $value - PHP value of the field's content
-     */
-    function toString($value) {
-        return $value;
-    }
-
-    function getLabel() { return $this->get('label'); }
-
-    /**
-     * getImpl
-     *
-     * Magic method that will return an implementation instance of this
-     * field based on the simple text value of the 'type' value of this
-     * field instance. The list of registered fields is determined by the
-     * global get_dynamic_field_types() function. The data from this model
-     * will be used to initialize the returned instance.
-     *
-     * For instance, if the value of this field is 'text', a TextField
-     * instance will be returned.
-     */
-    function getImpl() {
-        $type = get_dynamic_field_types();
-        $clazz = $type[$this->get('type')][1];
-        return new $clazz($this->ht);
-    }
-
     function getAnswer() { return $this->answer; }
-
-    function getFormName() {
-        return '_form-field-id-'.$this->get('id');
-    }
-
-    function render() {
-        $this->getWidget()->render();
-    }
 
     function getConfigurationOptions() {
         return array();
@@ -314,20 +198,6 @@ class DynamicFormField extends VerySimpleModel {
         return true;
     }
 
-    function all($sort='sort') {
-        return parent::all(get_class(), DYNAMIC_FORM_FIELD_TABLE, $sort);
-    }
-
-    function find($where, $sort='sort') {
-        return parent::find(get_class(), DYNAMIC_FORM_FIELD_TABLE, $where,
-            $sort);
-    }
-
-    function lookup($id) {
-        return parent::lookup(get_class(), DYNAMIC_FORM_FIELD_TABLE,
-            array('id'=>$id));
-    }
-
     function delete() {
         // Don't really delete form fields as that will screw up the data
         // model. Instead, just drop the association with the form section
@@ -342,11 +212,11 @@ class DynamicFormField extends VerySimpleModel {
     function save() {
         if (count($this->dirty))
             $this->set('updated', new SqlFunction('NOW'));
-        return parent::save(DYNAMIC_FORM_FIELD_TABLE, 'id');
+        return parent::save();
     }
 
-    function create($ht=false) {
-        $inst = parent::create(get_class(), $ht);
+    static function create($ht=false) {
+        $inst = parent::create($ht);
         $inst->set('created', new SqlFunction('NOW'));
         return $inst;
     }
@@ -364,9 +234,20 @@ class DynamicFormField extends VerySimpleModel {
  */
 class DynamicFormEntry extends VerySimpleModel {
 
+    static $meta = array(
+        'table' => DYNAMIC_FORM_ENTRY_TABLE,
+        'ordering' => array('sort'),
+        'joins' => array(
+            'form' => array(
+                'null' => true,
+                'constraint' => array('form_id' => 'DynamicFormSection.id'),
+            ),
+        ),
+    );
+
     function getAnswers() {
         if (!$this->_values) {
-            $this->_values = DynamicFormEntryAnswer::find(
+            $this->_values = DynamicFormEntryAnswer::objects()->filter(
                 array('entry_id'=>$this->get('id')));
             foreach ($this->_values as $v)
                 $v->entry = $this;
@@ -424,7 +305,7 @@ class DynamicFormEntry extends VerySimpleModel {
     }
 
     function forTicket($ticket_id) {
-        return self::find(array('ticket_id'=>$ticket_id));
+        return self::objects()->filter(array('ticket_id'=>$ticket_id));
     }
 
     /**
@@ -454,15 +335,10 @@ class DynamicFormEntry extends VerySimpleModel {
         }
     }
 
-    function find($where, $sort='sort') {
-        return parent::find(get_class(), DYNAMIC_FORM_ENTRY_TABLE, $where,
-            $sort);
-    }
-
     function save() {
         if (count($this->dirty))
             $this->set('updated', new SqlFunction('NOW'));
-        parent::save(DYNAMIC_FORM_ENTRY_TABLE, 'id');
+        parent::save('id');
         foreach ($this->getAnswers() as $a) {
             $a->set('value', $a->getField()->to_database($a->getField()->getClean()));
             $a->set('entry_id', $this->get('id'));
@@ -471,8 +347,8 @@ class DynamicFormEntry extends VerySimpleModel {
         $this->_values = array();
     }
 
-    function create($ht=false) {
-        $inst = parent::create(get_class(), $ht);
+    static function create($ht=false) {
+        $inst = parent::create($ht);
         $inst->set('created', new SqlFunction('NOW'));
         foreach ($inst->getForm()->getFields() as $f) {
             $a = DynamicFormEntryAnswer::create(
@@ -490,6 +366,16 @@ class DynamicFormEntry extends VerySimpleModel {
  * field which was originally used for the submission.
  */
 class DynamicFormEntryAnswer extends VerySimpleModel {
+
+    static $meta = array(
+        'table' => DYNAMIC_FORM_FIELD_TABLE,
+        'ordering' => array('field__sort'),
+        'pk' => array('entry_id', 'field_id'),
+        'joins' => array(
+            'field' => array('field_id' => 'DynamicFormField.id'),
+            'entry' => array('entry_id' => 'DynamicFormEntry.id'),
+        ),
+    );
 
     function getEntry() {
         return $this->entry;
@@ -511,7 +397,6 @@ class DynamicFormEntryAnswer extends VerySimpleModel {
 
     function getJoins() {
         return array(
-            'field' => array('field_id', DynamicFormField, DYNAMIC_FORM_FIELD_TABLE, 'id')
         );
     }
 
@@ -524,20 +409,6 @@ class DynamicFormEntryAnswer extends VerySimpleModel {
     function toString() {
         return $this->getField()->toString($this->getValue());
     }
-
-    function find($where, $sort='field__sort') {
-        return parent::find(get_class(), DYNAMIC_FORM_ANSWER_TABLE, $where,
-            $sort);
-    }
-
-    function save() {
-        return parent::save(DYNAMIC_FORM_ANSWER_TABLE, array('entry_id',
-            'field_id'));
-    }
-
-    function create($ht=false) {
-        return parent::create(get_class(), $ht);
-    }
 }
 
 /**
@@ -548,9 +419,15 @@ class DynamicFormEntryAnswer extends VerySimpleModel {
  */
 class DynamicFormset extends VerySimpleModel {
 
+    static $meta = array(
+        'table' => DYNAMIC_FORMSET_TABLE,
+        'ordering' => array('title'),
+        'pk' => array('id'),
+    );
+
     function getForms() {
         if (!$this->_forms)
-            $this->_forms = DynamicFormsetSections::find(
+            $this->_forms = DynamicFormsetSections::objects()->filter(
                     array('formset_id'=>$this->get('id')));
         return $this->_forms;
     }
@@ -571,40 +448,16 @@ class DynamicFormset extends VerySimpleModel {
         return count($this->_errors) === 0;
     }
 
-    function all($sort='title', $limit=false, $offset=false) {
-        return parent::all(get_class(), DYNAMIC_FORMSET_TABLE, $sort,
-                $limit, $offset);
-    }
-
-    function find($where, $sort='sort') {
-        return parent::find(get_class(), DYNAMIC_FORMSET_TABLE, $where,
-            $sort);
-    }
-
-    function lookup($id) {
-        return parent::lookup(get_class(), DYNAMIC_FORMSET_TABLE,
-            array('id'=>$id));
-    }
-
-    function count($where=false) {
-        return parent::count(get_class(), DYNAMIC_FORMSET_TABLE, $where);
-    }
-
     function save() {
         if (count($this->dirty))
             $this->set('updated', new SqlFunction('NOW'));
-        return parent::save(DYNAMIC_FORMSET_TABLE, array('id'));
+        return parent::save();
     }
 
-    function create($ht=false) {
-        $inst = parent::create(get_class(), $ht);
+    static function create($ht=false) {
+        $inst = parent::create($ht);
         $inst->set('created', new SqlFunction('NOW'));
         return $inst;
-    }
-
-    function delete() {
-        return parent::delete(DYNAMIC_FORMSET_TABLE,
-                array('id'));
     }
 }
 
@@ -613,10 +466,11 @@ class DynamicFormset extends VerySimpleModel {
  * "form" (DynamicFormset).
  */
 class DynamicFormsetSections extends VerySimpleModel {
-    function find($where, $sort='sort') {
-        return parent::find(get_class(), DYNAMIC_FORMSET_SEC_TABLE, $where,
-            $sort);
-    }
+    static $meta = array(
+        'table' => DYNAMIC_FORMSET_SEC_TABLE,
+        'ordering' => array('sort'),
+        'pk' => array('id'),
+    );
 
     function getForm() {
         if (!$this->_section)
@@ -634,19 +488,6 @@ class DynamicFormsetSections extends VerySimpleModel {
             $this->_errors['sort'] = 'Enter a number';
         return count($this->errors()) === 0;
     }
-
-    function delete() {
-        return parent::delete(DYNAMIC_FORMSET_SEC_TABLE,
-                array('id'));
-    }
-
-    function create($ht=false) {
-        return parent::create(get_class(), $ht);
-    }
-
-    function save() {
-        return parent::save(DYNAMIC_FORMSET_SEC_TABLE, array('id'));
-    }
 }
 
 /**
@@ -656,6 +497,11 @@ class DynamicFormsetSections extends VerySimpleModel {
  * model.
  */
 class DynamicList extends VerySimpleModel {
+
+    static $meta = array(
+        'table' => DYNAMIC_LIST_TABLE,
+        'ordering' => array('name'),
+    );
 
     function getSortModes() {
         return array(
@@ -682,8 +528,10 @@ class DynamicList extends VerySimpleModel {
 
     function getItems($limit=false, $offset=false) {
         if (!$this->_items) {
-            $this->_items = DynamicListItem::find(array('list_id'=>$this->get('id')),
-                $this->getListOrderBy(), $limit, $false);
+            $this->_items = DynamicListItem::objects()->filter(
+                    array('list_id'=>$this->get('id')))
+                ->order_by($this->getListOrderBy())
+                ->limit($limit);
         }
         return $this->_items;
     }
@@ -692,32 +540,13 @@ class DynamicList extends VerySimpleModel {
         return DynamicListItem::count(array('list_id'=>$this->get('id')));
     }
 
-    function all($sort='name', $limit=false, $offset=false) {
-        return parent::all(get_class(), DYNAMIC_LIST_TABLE, $sort, $limit,
-                $offset);
-    }
-
-    function count($where=false) {
-        return parent::count(get_class(), DYNAMIC_LIST_TABLE, $where);
-    }
-
-    function find($where, $sort='name') {
-        return parent::find(get_class(), DYNAMIC_LIST_TABLE, $where,
-            $sort);
-    }
-
-    function lookup($id) {
-        return parent::lookup(get_class(), DYNAMIC_LIST_TABLE,
-            array('id'=>$id));
-    }
-
     function save() {
         if (count($this->dirty))
             $this->set('updated', new SqlFunction('NOW'));
-        return parent::save(DYNAMIC_LIST_TABLE, 'id');
+        return parent::save();
     }
 
-    function create($ht=false) {
+    static function create($ht=false) {
         $inst = parent::create(get_class(), $ht);
         $inst->set('created', new SqlFunction('NOW'));
         return $inst;
@@ -737,30 +566,20 @@ class DynamicList extends VerySimpleModel {
  *      that this item should come in the dropdown list
  */
 class DynamicListItem extends VerySimpleModel {
+
+    static $meta = array(
+        'table' => DYNAMIC_LIST_ITEM_TABLE,
+        'pk' => array('id'),
+        'joins' => array(
+            'list' => array(
+                'null' => true,
+                'constraint' => array('list_id' => 'DynamicList.id'),
+            ),
+        ),
+    );
+
     function toString() {
         return $this->get('value');
-    }
-
-    function lookup($id) {
-        return parent::lookup(get_class(), DYNAMIC_LIST_ITEM_TABLE,
-            array('id'=>$id));
-    }
-
-    function find($where, $sort=false, $limit=false, $offset=false) {
-        return parent::find(get_class(), DYNAMIC_LIST_ITEM_TABLE, $where,
-            $sort, $limit, $offset);
-    }
-
-    function count($where=false) {
-        return parent::count(get_class(), DYNAMIC_LIST_ITEM_TABLE, $where);
-    }
-
-    function save() {
-        return parent::save(DYNAMIC_LIST_ITEM_TABLE, 'id');
-    }
-
-    function create($ht=false) {
-        return parent::create(get_class(), $ht);
     }
 
     function delete() {
@@ -771,226 +590,7 @@ class DynamicListItem extends VerySimpleModel {
     }
 }
 
-class TextboxField extends DynamicFormField {
-    function getWidget() {
-        return new TextboxWidget($this);
-    }
-
-    function getConfigurationOptions() {
-        return array(
-            'size'  =>  new TextboxField(array(
-                'id'=>1, 'label'=>'Size', 'required'=>false, 'default'=>16,
-                    'validator' => 'number')),
-            'length' => new TextboxField(array(
-                'id'=>2, 'label'=>'Max Length', 'required'=>false, 'default'=>30,
-                    'validator' => 'number')),
-            'validator' => new ChoiceField(array(
-                'id'=>3, 'label'=>'Validator', 'required'=>false, 'default'=>'',
-                'choices' => array('phone'=>'Phone Number','email'=>'Email Address',
-                    'ip'=>'IP Address', 'number'=>'Number', ''=>'None'))),
-        );
-    }
-
-    function validateEntry($value) {
-        parent::validateEntry($value);
-        $validators = array(
-            '' =>       null,
-            'email' =>  array(array('Validator', 'is_email'),
-                'Enter a valid email address'),
-            'phone' =>  array(array('Validator', 'is_phone'),
-                'Enter a valid phone number'),
-            'ip' =>     array(array('Validator', 'is_ip'),
-                'Enter a valid IP address'),
-            'number' => array('is_numeric', 'Enter a number')
-        );
-        // Support configuration forms, as well as GUI-based form fields
-        $valid = $this->get('validator');
-        if (!$valid) {
-            $config = $this->getConfiguration();
-            $valid = $config['validator'];
-        }
-        $func = $validators[$valid];
-        if (is_array($func) && is_callable($func[0]))
-            if (!call_user_func($func[0], $value))
-                $this->_errors[] = $func[1];
-    }
-}
-
-class TextareaField extends DynamicFormField {
-    function getWidget() {
-        return new TextareaWidget($this);
-    }
-    function getConfigurationOptions() {
-        return array(
-            'cols'  =>  new TextboxField(array(
-                'id'=>1, 'label'=>'Width (chars)', 'required'=>true, 'default'=>40)),
-            'rows'  =>  new TextboxField(array(
-                'id'=>2, 'label'=>'Height (rows)', 'required'=>false, 'default'=>4)),
-            'length' => new TextboxField(array(
-                'id'=>3, 'label'=>'Max Length', 'required'=>false, 'default'=>30))
-        );
-    }
-}
-
-class PhoneField extends DynamicFormField {
-    function validateEntry($value) {
-        parent::validateEntry($value);
-        # Run validator against $this->value for email type
-        list($phone, $ext) = explode("X", $value, 2);
-        if ($phone && !Validator::is_phone($phone))
-            $this->_errors[] = "Enter a valid phone number";
-        if ($ext) {
-            if (!is_numeric($ext))
-                $this->_errors[] = "Enter a valide phone extension";
-            elseif (!$phone)
-                $this->_errors[] = "Enter a phone number for the extension";
-        }
-    }
-    function getWidget() {
-        return new PhoneNumberWidget($this);
-    }
-
-    function toString($value) {
-        list($phone, $ext) = explode("X", $value, 2);
-        $phone=Format::phone($phone);
-        if ($ext)
-            $phone.=" x$ext";
-        return $phone;
-    }
-}
-
-class BooleanField extends DynamicFormField {
-    function getWidget() {
-        return new CheckboxWidget($this);
-    }
-
-    function getConfigurationOptions() {
-        return array(
-            'desc' => new TextareaField(array(
-                'id'=>1, 'label'=>'Description', 'required'=>false, 'default'=>'',
-                'hint'=>'Text shown inline with the widget',
-                'configuration'=>array('rows'=>2)))
-        );
-    }
-
-    function to_database($value) {
-        return ($value) ? '1' : '0';
-    }
-
-    function to_php($value) {
-        return ((int)$value) ? true : false;
-    }
-
-    function toString($value) {
-        return ($value) ? 'Yes' : 'No';
-    }
-}
-
-class ChoiceField extends DynamicFormField {
-    function getWidget() {
-        return new ChoicesWidget($this);
-    }
-
-    function getConfigurationOptions() {
-        return array(
-            'choices'  =>  new TextareaField(array(
-                'id'=>1, 'label'=>'Choices', 'required'=>false, 'default'=>'')),
-        );
-    }
-}
-
-class DatetimeField extends DynamicFormField {
-    function getWidget() {
-        return new DatetimePickerWidget($this);
-    }
-
-    function to_database($value) {
-        // Store time in gmt time, unix epoch format
-        return (string) $value;
-    }
-
-    function to_php($value) {
-        if (!$value)
-            return $value;
-        else
-            return (int) $value;
-    }
-
-    function parse($value) {
-        if (!$value) return null;
-        $config = $this->getConfiguration();
-        return ($config['gmt']) ? Misc::db2gmtime($value) : strtotime($value);
-    }
-
-    function toString($value) {
-        global $cfg;
-        $config = $this->getConfiguration();
-        $format = ($config['time'])
-            ? $cfg->getDateTimeFormat() : $cfg->getDateFormat();
-        if ($config['gmt'])
-            // Return time local to user's timezone
-            return Format::userdate($format, $value);
-        else
-            return Format::date($format, $value);
-    }
-
-    function getConfigurationOptions() {
-        return array(
-            'time' => new BooleanField(array(
-                'id'=>1, 'label'=>'Time', 'required'=>false, 'default'=>false,
-                'configuration'=>array(
-                    'desc'=>'Show time selection with date picker'))),
-            'gmt' => new BooleanField(array(
-                'id'=>2, 'label'=>'Timezone Aware', 'required'=>false,
-                'configuration'=>array(
-                    'desc'=>"Show date/time relative to user's timezone"))),
-            'min' => new DatetimeField(array(
-                'id'=>3, 'label'=>'Earliest', 'required'=>false,
-                'hint'=>'Earliest date selectable')),
-            'max' => new DatetimeField(array(
-                'id'=>4, 'label'=>'Latest', 'required'=>false,
-                'default'=>null)),
-            'future' => new BooleanField(array(
-                'id'=>5, 'label'=>'Allow Future Dates', 'required'=>false,
-                'default'=>true, 'configuration'=>array(
-                    'desc'=>'Allow entries into the future'))),
-        );
-    }
-
-    function validateEntry($value) {
-        $config = $this->getConfiguration();
-        parent::validateEntry($value);
-        if (!$value) return;
-        if ($config['min'] and $value < $config['min'])
-            $this->_errors[] = 'Selected date is earlier than permitted';
-        elseif ($config['max'] and $value > $config['max'])
-            $this->_errors[] = 'Selected date is later than permitted';
-        // strtotime returns -1 on error for PHP < 5.1.0 and false thereafter
-        elseif ($value === -1 or $value === false)
-            $this->_errors[] = 'Enter a valid date';
-    }
-}
-
-function get_dynamic_field_types() {
-    static $types = false;
-    if (!$types) {
-        $types = array(
-            'text'  => array('Short Answer', TextboxField),
-            'memo' => array('Long Answer', TextareaField),
-            'datetime' => array('Date and Time', DatetimeField),
-            'phone' => array('Phone Number', PhoneField),
-            'bool' => array('Checkbox', BooleanField),
-            'choices' => array('Choices', ChoiceField),
-        );
-        foreach (DynamicList::all() as $list) {
-            $types['list-'.$list->get('id')] = array('Selection: ' . $list->getPluralName(),
-                SelectionField, $list->get('id'));
-        }
-    }
-    return $types;
-}
-
-class SelectionField extends DynamicFormField {
+class SelectionField extends FormField {
     function getList() {
         if (!$this->_list) {
             $list_id = explode('-', $this->get('type'));
@@ -1012,7 +612,8 @@ class SelectionField extends DynamicFormField {
         $item = DynamicListItem::lookup($id);
         # Attempt item lookup by name too
         if (!$item) {
-            $item = DynamicListItem::find(array('value'=>$id,
+            $item = DynamicListItem::objects->filter(array(
+                        'value'=>$id,
                         'list_id'=>$this->getList()->get('id')));
             $item = (count($item)) ? $item[0] : null;
         }
@@ -1038,134 +639,6 @@ class SelectionField extends DynamicFormField {
                 'hint'=>'Typeahead will work better for large lists')),
         );
     }
-}
-
-class Widget {
-    function Widget() {
-        # Not called in PHP5
-        call_user_func_array(array(&$this, '__construct'), func_get_args());
-    }
-
-    function __construct($field) {
-        $this->field = $field;
-        $this->name = $field->getFormName();
-        if ($_SERVER['REQUEST_METHOD'] == 'POST')
-            $this->value = $this->getValue();
-        elseif (is_object($field->getAnswer()))
-            $this->value = $field->getAnswer()->getValue();
-        if (!$this->value && $field->value)
-            $this->value = $field->value;
-    }
-
-    function getValue() {
-        return $_POST[$this->name];
-    }
-}
-
-class TextboxWidget extends Widget {
-    function render() {
-        $config = $this->field->getConfiguration();
-        if (isset($config['size']))
-            $size = "size=\"{$config['size']}\"";
-        if (isset($config['length']))
-            $maxlength = "maxlength=\"{$config['length']}\"";
-        ?>
-        <span style="display:inline-block">
-        <input type="text" id="<?php echo $this->name; ?>"
-            <?php echo $size . " " . $maxlength; ?>
-            name="<?php echo $this->name; ?>"
-            value="<?php echo Format::htmlchars($this->value); ?>"/>
-        </span>
-        <?php
-    }
-}
-
-class TextareaWidget extends Widget {
-    function render() {
-        $config = $this->field->getConfiguration();
-        if (isset($config['rows']))
-            $rows = "rows=\"{$config['rows']}\"";
-        if (isset($config['cols']))
-            $cols = "cols=\"{$config['cols']}\"";
-        if (isset($config['length']))
-            $maxlength = "maxlength=\"{$config['length']}\"";
-        ?>
-        <span style="display:inline-block">
-        <textarea <?php echo $rows." ".$cols." ".$length; ?>
-            name="<?php echo $this->name; ?>"><?php
-                echo Format::htmlchars($this->value);
-            ?></textarea>
-        </span>
-        <?php
-    }
-}
-
-class PhoneNumberWidget extends Widget {
-    function render() {
-        list($phone, $ext) = explode("X", $this->value);
-        ?>
-        <input type="test" name="<?php echo $this->name; ?>" value="<?php
-            echo $phone; ?>"/> Ext: <input type="text" name="<?php
-            echo $this->name; ?>-ext" value="<?php echo $ext; ?>" size="5"/>
-        <?php
-    }
-
-    function getValue() {
-        $ext = $_POST["{$this->name}-ext"];
-        if ($ext) $ext = 'X'.$ext;
-        return parent::getValue() . $ext;
-    }
-}
-
-class ChoicesWidget extends Widget {
-    function render() {
-        $config = $this->field->getConfiguration();
-        // Determine the value for the default (the one listed if nothing is
-        // selected)
-        $def_key = $this->field->get('default');
-        $choices = $this->getChoices();
-        $have_def = isset($choices[$def_key]);
-        if (!$have_def)
-            $def_val = 'Select '.$this->field->get('label');
-        else
-            $def_val = $choices[$def_key];
-        ?> <span style="display:inline-block">
-        <select name="<?php echo $this->name; ?>">
-            <?php if (!$have_def) { ?>
-            <option value="<?php echo $def_key; ?>">&mdash; <?php
-                echo $def_val; ?> &mdash;</option>
-            <?php }
-            foreach ($choices as $key=>$name) {
-                if (!$have_def && $key == $def_key)
-                    continue; ?>
-                <option value="<?php echo $key; ?>"
-                <?php if ($this->value == $key) echo 'selected="selected"';
-                ?>><?php echo $name; ?></option>
-            <?php } ?>
-        </select>
-        </span>
-        <?php
-    }
-
-    function getChoices() {
-        if ($this->_choices === null) {
-            // Allow choices to be set in this->ht (for configurationOptions)
-            $this->_choices = $this->field->get('choices');
-            if (!$this->_choices) {
-                $this->_choices = array();
-                $config = $this->field->getConfiguration();
-                $choices = explode("\n", $config['choices']);
-                foreach ($choices as $choice) {
-                    // Allow choices to be key: value
-                    list($key, $val) = explode(':', $choice);
-                    if ($val == null)
-                        $val = $key;
-                    $this->_choices[trim($key)] = trim($val);
-                }
-            }
-        }
-        return $this->_choices;
-     }
 }
 
 class SelectionWidget extends ChoicesWidget {
@@ -1221,85 +694,17 @@ class SelectionWidget extends ChoicesWidget {
     }
 }
 
-class CheckboxWidget extends Widget {
-    function __construct($field) {
-        parent::__construct($field);
-        $this->name = '_field-checkboxes';
-    }
+$a = DynamicFormSet::objects()->filter(array('name'=>'default'))
+    ->filter(array('id__gt'=>3), array('id__lt'=>1))->order_by('name');
 
-    function render() {
-        $config = $this->field->getConfiguration();
-        ?>
-        <input type="checkbox" name="<?php echo $this->name; ?>[]" <?php
-            if ($this->value) echo 'checked="checked"'; ?> value="<?php
-            echo $this->field->get('id'); ?>"/>
-        <?php
-        if ($config['desc']) { ?>
-            <em style="display:inline-block"><?php
-                echo Format::htmlchars($config['desc']); ?></em>
-        <?php }
-    }
-
-    function getValue() {
-        if (count($_POST))
-            return @in_array($this->field->get('id'), $_POST[$this->name]);
-        return parent::getValue();
-    }
+$start = microtime(true);
+for ($i=0; $i<10000; $i++) {
+    $b = DynamicListItem::objects()
+        ->filter(array('list__name'=>'bubba'))
+        ->values('id', 'list__id');
 }
+var_dump(microtime(true) - $start);
 
-class DatetimePickerWidget extends Widget {
-    function render() {
-        $config = $this->field->getConfiguration();
-        if ($this->value) {
-            $this->value = (is_int($this->value) ? $this->value :
-                    strtotime($this->value));
-            if ($config['gmt'])
-                $this->value += 3600 *
-                    $_SESSION['TZ_OFFSET']+($_SESSION['TZ_DST']?date('I',$time):0);
-
-            list($hr, $min) = explode(':', date('H:i', $this->value));
-            $this->value = date('m/d/Y', $this->value);
-        }
-        ?>
-        <input type="text" name="<?php echo $this->name; ?>"
-            value="<?php echo Format::htmlchars($this->value); ?>" size="12"
-            autocomplete="off" />
-        <script type="text/javascript">
-            $(function() {
-                $('input[name="<?php echo $this->name; ?>"]').datepicker({
-                    <?php
-                    if ($config['min'])
-                        echo "minDate: new Date({$config['min']}000),";
-                    if ($config['max'])
-                        echo "maxDate: new Date({$config['max']}000),";
-                    elseif (!$config['future'])
-                        echo "maxDate: new Date().getTime(),";
-                    ?>
-                    numberOfMonths: 2,
-                    showButtonPanel: true,
-                    buttonImage: './images/cal.png',
-                    showOn:'both'
-                });
-            });
-        </script>
-        <?php
-        if ($config['time'])
-            // TODO: Add time picker -- requires time picker or selection with
-            //       Misc::timeDropdown
-            echo '&nbsp;' . Misc::timeDropdown($hr, $min, $this->name . ':time');
-    }
-
-    /**
-     * Function: getValue
-     * Combines the datepicker date value and the time dropdown selected
-     * time value into a single date and time string value.
-     */
-    function getValue() {
-        $datetime = parent::getValue();
-        if ($datetime && isset($_POST[$this->name . ':time']))
-            $datetime .= ' ' . $_POST[$this->name . ':time'];
-        return $datetime;
-    }
-}
+print($b);
 
 ?>
