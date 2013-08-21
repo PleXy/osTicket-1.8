@@ -172,8 +172,8 @@ INSERT INTO `%TABLE_PREFIX%config` (`namespace`, `key`, `value`) VALUES
   ('core', 'helpdesk_url', ''),
   ('core', 'schema_signature', '');
 
-DROP TABLE IF EXISTS `%TABLE_PREFIX%dynamic_formset`;
-CREATE TABLE `%TABLE_PREFIX%dynamic_formset` (
+DROP TABLE IF EXISTS `%TABLE_PREFIX%formset`;
+CREATE TABLE `%TABLE_PREFIX%formset` (
     `id` int(11) unsigned auto_increment,
     `title` varchar(255) NOT NULL,
     `instructions` varchar(512),
@@ -183,8 +183,8 @@ CREATE TABLE `%TABLE_PREFIX%dynamic_formset` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARSET=utf8;
 
-DROP TABLE IF EXISTS `%TABLE_PREFIX%dynamic_formset_sections`;
-CREATE TABLE `%TABLE_PREFIX%dynamic_formset_sections` (
+DROP TABLE IF EXISTS `%TABLE_PREFIX%formset_sections`;
+CREATE TABLE `%TABLE_PREFIX%formset_sections` (
     `id` int(11) unsigned NOT NULL auto_increment,
     `formset_id` int(11) NOT NULL,
     `section_id` int(11) NOT NULL,
@@ -195,8 +195,8 @@ CREATE TABLE `%TABLE_PREFIX%dynamic_formset_sections` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARSET=utf8;
 
-DROP TABLE IF EXISTS `%TABLE_PREFIX%dynamic_form_section`;
-CREATE TABLE `%TABLE_PREFIX%dynamic_form_section` (
+DROP TABLE IF EXISTS `%TABLE_PREFIX%form_section`;
+CREATE TABLE `%TABLE_PREFIX%form_section` (
     `id` int(11) unsigned NOT NULL auto_increment,
     `title` varchar(255) NOT NULL,
     `instructions` varchar(512),
@@ -206,8 +206,8 @@ CREATE TABLE `%TABLE_PREFIX%dynamic_form_section` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARSET=utf8;
 
-DROP TABLE IF EXISTS `%TABLE_PREFIX%dynamic_form_field`;
-CREATE TABLE `%TABLE_PREFIX%dynamic_form_field` (
+DROP TABLE IF EXISTS `%TABLE_PREFIX%form_field`;
+CREATE TABLE `%TABLE_PREFIX%form_field` (
     `id` int(11) unsigned NOT NULL auto_increment,
     `section_id` int(11) unsigned NOT NULL,
     `type` varchar(255) NOT NULL DEFAULT 'text',
@@ -223,8 +223,8 @@ CREATE TABLE `%TABLE_PREFIX%dynamic_form_field` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARSET=utf8;
 
-DROP TABLE IF EXISTS `%TABLE_PREFIX%dynamic_form_entry`;
-CREATE TABLE `%TABLE_PREFIX%dynamic_form_entry` (
+DROP TABLE IF EXISTS `%TABLE_PREFIX%form_entry`;
+CREATE TABLE `%TABLE_PREFIX%form_entry` (
     `id` int(11) unsigned NOT NULL auto_increment,
     `section_id` int(11) unsigned NOT NULL,
     `ticket_id` int(11) unsigned,
@@ -235,17 +235,17 @@ CREATE TABLE `%TABLE_PREFIX%dynamic_form_entry` (
     KEY `ticket_dyn_form_lookup` (`ticket_id`)
 ) DEFAULT CHARSET=utf8;
 
-DROP TABLE IF EXISTS `%TABLE_PREFIX%dynamic_form_entry_values`;
-CREATE TABLE `%TABLE_PREFIX%dynamic_form_entry_values` (
-    -- references dynamic_form_entry.id
+DROP TABLE IF EXISTS `%TABLE_PREFIX%form_entry_values`;
+CREATE TABLE `%TABLE_PREFIX%form_entry_values` (
+    -- references form_entry.id
     `entry_id` int(11) unsigned NOT NULL,
     `field_id` int(11) unsigned NOT NULL,
     `value` text,
     PRIMARY KEY (`entry_id`, `field_id`)
 ) DEFAULT CHARSET=utf8;
 
-DROP TABLE IF EXISTS `%TABLE_PREFIX%dynamic_list`;
-CREATE TABLE `%TABLE_PREFIX%dynamic_list` (
+DROP TABLE IF EXISTS `%TABLE_PREFIX%list`;
+CREATE TABLE `%TABLE_PREFIX%list` (
     `id` int(11) unsigned NOT NULL auto_increment,
     `name` varchar(255) NOT NULL,
     `name_plural` varchar(255),
@@ -256,8 +256,8 @@ CREATE TABLE `%TABLE_PREFIX%dynamic_list` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARSET=utf8;
 
-DROP TABLE IF EXISTS `%TABLE_PREFIX%dynamic_list_items`;
-CREATE TABLE `%TABLE_PREFIX%dynamic_list_items` (
+DROP TABLE IF EXISTS `%TABLE_PREFIX%list_items`;
+CREATE TABLE `%TABLE_PREFIX%list_items` (
     `id` int(11) unsigned NOT NULL auto_increment,
     `list_id` int(11),
     `value` varchar(255) NOT NULL,
@@ -265,7 +265,7 @@ CREATE TABLE `%TABLE_PREFIX%dynamic_list_items` (
     `extra` varchar(255),
     `sort` int(11) NOT NULL DEFAULT 1,
     PRIMARY KEY (`id`),
-    KEY `dynamic_list_item_lookup` (`list_id`)
+    KEY `list_item_lookup` (`list_id`)
 ) DEFAULT CHARSET=utf8;
 
 

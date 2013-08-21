@@ -12,7 +12,7 @@ $searchTerm='';
 //make sure the search query is 3 chars min...defaults to no query with warning message
 if($search) {
   $searchTerm=$_REQUEST['query'];
-  if( ($_REQUEST['query'] && strlen($_REQUEST['query'])<3) 
+  if( ($_REQUEST['query'] && strlen($_REQUEST['query'])<3)
       || (!$_REQUEST['query'] && isset($_REQUEST['basic_search'])) ){ //Why do I care about this crap...
       $search=false; //Instead of an error page...default back to regular query..with no search.
       $errors['err']='Search term must be more than 3 chars';
@@ -21,7 +21,7 @@ if($search) {
 }
 $showoverdue=$showanswered=false;
 $staffId=0; //Nothing for now...TODO: Allow admin and manager to limit tickets to single staff level.
-$showassigned= true; //show Assigned To column - defaults to true 
+$showassigned= true; //show Assigned To column - defaults to true
 
 //Get status we are actually going to use on the query...making sure it is clean!
 $status=null;
@@ -54,12 +54,12 @@ switch(strtolower($_REQUEST['status'])){ //Status is overloaded
 }
 
 $qwhere ='';
-/* 
+/*
    STRICT DEPARTMENTS BASED PERMISSION!
    User can also see tickets assigned to them regardless of the ticket's dept.
 */
 
-$depts=$thisstaff->getDepts();    
+$depts=$thisstaff->getDepts();
 $qwhere =' WHERE ( '
         .'  ticket.staff_id='.db_input($thisstaff->getId());
 
@@ -73,7 +73,7 @@ $qwhere .= ' )';
 
 //STATUS
 if($status) {
-    $qwhere.=' AND status='.db_input(strtolower($status));    
+    $qwhere.=' AND status='.db_input(strtolower($status));
 }
 
 //Queues: Overloaded sub-statuses  - you've got to just have faith!
@@ -87,10 +87,10 @@ if($staffId && ($staffId==$thisstaff->getId())) { //My tickets
     $qwhere.=' AND isanswered=1 ';
 }elseif(!strcasecmp($status, 'open') && !$search) { //Open queue (on search OPEN means all open tickets - regardless of state).
     //Showing answered tickets on open queue??
-    if(!$cfg->showAnsweredTickets()) 
+    if(!$cfg->showAnsweredTickets())
         $qwhere.=' AND isanswered=0 ';
 
-    /* Showing assigned tickets on open queue? 
+    /* Showing assigned tickets on open queue?
        Don't confuse it with show assigned To column -> F'it it's confusing - just trust me!
      */
     if(!($cfg->showAssignedTickets() || $thisstaff->showAssignedTickets())) {
@@ -99,7 +99,7 @@ if($staffId && ($staffId==$thisstaff->getId())) { //My tickets
     }
 }
 
-//Search?? Somebody...get me some coffee 
+//Search?? Somebody...get me some coffee
 $deep_search=false;
 if($search):
     $qstr.='&a='.urlencode($_REQUEST['a']);
@@ -116,8 +116,8 @@ if($search):
             #      the thread message
             $qwhere.=" AND email.value='$queryterm'";
         }else{//Deep search!
-            //This sucks..mass scan! search anything that moves! 
-            
+            //This sucks..mass scan! search anything that moves!
+
             $deep_search=true;
         }
     }
@@ -133,24 +133,24 @@ if($search):
         $qwhere.=' AND ticket.topic_id='.db_input($_REQUEST['topicId']);
         $qstr.='&topicId='.urlencode($_REQUEST['topicId']);
     }
-        
-    //Assignee 
+
+    //Assignee
     if(isset($_REQUEST['assignee']) && strcasecmp($_REQUEST['status'], 'closed'))  {
         $id=preg_replace("/[^0-9]/", "", $_REQUEST['assignee']);
         $assignee = $_REQUEST['assignee'];
         $qstr.='&assignee='.urlencode($_REQUEST['assignee']);
-        $qwhere.= ' AND ( 
+        $qwhere.= ' AND (
                 ( ticket.status="open" ';
-                  
+
         if($assignee[0]=='t')
             $qwhere.='  AND ticket.team_id='.db_input($id);
         elseif($assignee[0]=='s')
             $qwhere.='  AND ticket.staff_id='.db_input($id);
         elseif(is_numeric($id))
             $qwhere.='  AND ticket.staff_id='.db_input($id);
-        
+
        $qwhere.=' ) ';
-                   
+
         if($_REQUEST['staffId'] && !$_REQUEST['status']) { //Assigned TO + Closed By
             $qwhere.= ' OR (ticket.staff_id='.db_input($_REQUEST['staffId']). ' AND ticket.status="closed") ';
             $qstr.='&staffId='.urlencode($_REQUEST['staffId']);
@@ -158,7 +158,7 @@ if($search):
             $qwhere.= ' OR ticket.status="closed" ';
             $qstr.='&staffId='.urlencode($_REQUEST['staffId']);
         }
-            
+
         $qwhere.= ' ) ';
     } elseif($_REQUEST['staffId']) {
         $qwhere.=' AND (ticket.staff_id='.db_input($_REQUEST['staffId']).' AND ticket.status="closed") ';
@@ -176,7 +176,7 @@ if($search):
         if($startTime){
             $qwhere.=' AND ticket.created>=FROM_UNIXTIME('.$startTime.')';
             $qstr.='&startDate='.urlencode($_REQUEST['startDate']);
-                        
+
         }
         if($endTime){
             $qwhere.=' AND ticket.created<=FROM_UNIXTIME('.$endTime.')';
@@ -216,13 +216,13 @@ if($_REQUEST['sort'] && $queue) {
 
 //Set default sort by columns.
 if(!$order_by ) {
-    if($showanswered) 
+    if($showanswered)
         $order_by='ticket.lastresponse, ticket.created'; //No priority sorting for answered tickets.
     elseif(!strcasecmp($status,'closed'))
         $order_by='ticket.closed, ticket.created'; //No priority sorting for closed tickets.
     elseif($showoverdue) //priority> duedate > age in ASC order.
         $order_by='priority_urgency ASC, ISNULL(duedate) ASC, duedate ASC, effective_date ASC, ticket.created';
-    else //XXX: Add due date here?? No - 
+    else //XXX: Add due date here?? No -
         $order_by='priority_urgency ASC, effective_date DESC, ticket.created';
 }
 
@@ -237,9 +237,9 @@ $$x=' class="'.strtolower($order).'" ';
 if($_GET['limit'])
     $qstr.='&limit='.urlencode($_GET['limit']);
 
-$dynfields='(SELECT entry.ticket_id, value FROM '.DYNAMIC_FORM_ANSWER_TABLE.' ans '.
-         'LEFT JOIN '.DYNAMIC_FORM_ENTRY_TABLE.' entry ON entry.id=ans.entry_id '.
-         'LEFT JOIN '.DYNAMIC_FORM_FIELD_TABLE.' field ON field.id=ans.field_id '.
+$dynfields='(SELECT entry.ticket_id, value FROM '.FORM_ANSWER_TABLE.' ans '.
+         'LEFT JOIN '.FORM_ENTRY_TABLE.' entry ON entry.id=ans.entry_id '.
+         'LEFT JOIN '.FORM_FIELD_TABLE.' field ON field.id=ans.field_id '.
          'WHERE field.name = "%1$s")';
 $subject_sql=sprintf($dynfields, 'subject');
 $name_sql=sprintf($dynfields, 'name');
@@ -279,7 +279,7 @@ $qselect.=' ,count(attach.attach_id) as attachments '
          .' ,IF(ptopic.topic_pid IS NULL, topic.topic, CONCAT_WS(" / ", ptopic.topic, topic.topic)) as helptopic ';
 
 $qfrom.=' LEFT JOIN '.TICKET_PRIORITY_TABLE.' pri ON (ticket.priority_id=pri.priority_id) '
-       .' LEFT JOIN '.TICKET_LOCK_TABLE.' tlock ON (ticket.ticket_id=tlock.ticket_id AND tlock.expire>NOW() 
+       .' LEFT JOIN '.TICKET_LOCK_TABLE.' tlock ON (ticket.ticket_id=tlock.ticket_id AND tlock.expire>NOW()
                AND tlock.staff_id!='.db_input($thisstaff->getId()).') '
        .' LEFT JOIN '.TICKET_ATTACHMENT_TABLE.' attach ON (ticket.ticket_id=attach.ticket_id) '
        .' LEFT JOIN '.TICKET_THREAD_TABLE.' thread ON ( ticket.ticket_id=thread.ticket_id) '
@@ -338,13 +338,13 @@ $negorder=$order=='DESC'?'ASC':'DESC'; //Negate the sorting..
 	        <th width="8px">&nbsp;</th>
             <?php } ?>
 	        <th width="70">
-                <a <?php echo $id_sort; ?> href="tickets.php?sort=ID&order=<?php echo $negorder; ?><?php echo $qstr; ?>" 
+                <a <?php echo $id_sort; ?> href="tickets.php?sort=ID&order=<?php echo $negorder; ?><?php echo $qstr; ?>"
                     title="Sort By Ticket ID <?php echo $negorder; ?>">Ticket</a></th>
 	        <th width="70">
-                <a  <?php echo $date_sort; ?> href="tickets.php?sort=date&order=<?php echo $negorder; ?><?php echo $qstr; ?>" 
+                <a  <?php echo $date_sort; ?> href="tickets.php?sort=date&order=<?php echo $negorder; ?><?php echo $qstr; ?>"
                     title="Sort By Date <?php echo $negorder; ?>">Date</a></th>
 	        <th width="280">
-                 <a <?php echo $subj_sort; ?> href="tickets.php?sort=subj&order=<?php echo $negorder; ?><?php echo $qstr; ?>" 
+                 <a <?php echo $subj_sort; ?> href="tickets.php?sort=subj&order=<?php echo $negorder; ?><?php echo $qstr; ?>"
                     title="Sort By Subject <?php echo $negorder; ?>">Subject</a></th>
             <th width="170">
                 <a <?php echo $name_sort; ?> href="tickets.php?sort=name&order=<?php echo $negorder; ?><?php echo $qstr; ?>"
@@ -357,27 +357,27 @@ $negorder=$order=='DESC'?'ASC':'DESC'; //Negate the sorting..
             <?php
             } else { ?>
                 <th width="60" <?php echo $pri_sort;?>>
-                    <a <?php echo $pri_sort; ?> href="tickets.php?sort=pri&order=<?php echo $negorder; ?><?php echo $qstr; ?>" 
+                    <a <?php echo $pri_sort; ?> href="tickets.php?sort=pri&order=<?php echo $negorder; ?><?php echo $qstr; ?>"
                         title="Sort By Priority <?php echo $negorder; ?>">Priority</a></th>
             <?php
             }
 
-            if($showassigned ) { 
+            if($showassigned ) {
                 //Closed by
                 if(!strcasecmp($status,'closed')) { ?>
                     <th width="150">
-                        <a <?php echo $staff_sort; ?> href="tickets.php?sort=staff&order=<?php echo $negorder; ?><?php echo $qstr; ?>" 
+                        <a <?php echo $staff_sort; ?> href="tickets.php?sort=staff&order=<?php echo $negorder; ?><?php echo $qstr; ?>"
                             title="Sort By Closing Staff Name <?php echo $negorder; ?>">Closed By</a></th>
                 <?php
                 } else { //assigned to ?>
                     <th width="150">
-                        <a <?php echo $assignee_sort; ?> href="tickets.php?sort=assignee&order=<?php echo $negorder; ?><?php echo $qstr; ?>" 
+                        <a <?php echo $assignee_sort; ?> href="tickets.php?sort=assignee&order=<?php echo $negorder; ?><?php echo $qstr; ?>"
                             title="Sort By Assignee <?php echo $negorder;?>">Assigned To</a></th>
                 <?php
                 }
             } else { ?>
                 <th width="150">
-                    <a <?php echo $dept_sort; ?> href="tickets.php?sort=dept&order=<?php echo $negorder;?><?php echo $qstr; ?>" 
+                    <a <?php echo $dept_sort; ?> href="tickets.php?sort=dept&order=<?php echo $negorder;?><?php echo $qstr; ?>"
                         title="Sort By Department <?php echo $negorder; ?>">Department</a></th>
             <?php
             } ?>
@@ -416,8 +416,8 @@ $negorder=$order=='DESC'?'ASC':'DESC'; //Negate the sorting..
                 }
                 ?>
             <tr id="<?php echo $row['ticket_id']; ?>">
-                <?php if($thisstaff->canManageTickets()) { 
-                              
+                <?php if($thisstaff->canManageTickets()) {
+
                     $sel=false;
                     if($ids && in_array($row['ticket_id'], $ids))
                         $sel=true;
@@ -427,17 +427,17 @@ $negorder=$order=='DESC'?'ASC':'DESC'; //Negate the sorting..
                 </td>
                 <?php } ?>
                 <td align="center" title="<?php echo $row['email']; ?>" nowrap>
-                  <a class="Icon <?php echo strtolower($row['source']); ?>Ticket ticketPreview" title="Preview Ticket" 
+                  <a class="Icon <?php echo strtolower($row['source']); ?>Ticket ticketPreview" title="Preview Ticket"
                     href="tickets.php?id=<?php echo $row['ticket_id']; ?>"><?php echo $tid; ?></a></td>
                 <td align="center" nowrap><?php echo Format::db_date($row['created']); ?></td>
-                <td><a <?php if($flag) { ?> class="Icon <?php echo $flag; ?>Ticket" title="<?php echo ucfirst($flag); ?> Ticket" <?php } ?> 
+                <td><a <?php if($flag) { ?> class="Icon <?php echo $flag; ?>Ticket" title="<?php echo ucfirst($flag); ?> Ticket" <?php } ?>
                     href="tickets.php?id=<?php echo $row['ticket_id']; ?>"><?php echo $subject; ?></a>
                      &nbsp;
                      <?php echo ($threadcount>1)?" <small>($threadcount)</small>&nbsp;":''?>
                      <?php echo $row['attachments']?"<span class='Icon file'>&nbsp;</span>":''; ?>
                 </td>
                 <td nowrap>&nbsp;<?php echo Format::truncate($row['name'],22,strpos($row['name'],'@')); ?>&nbsp;</td>
-                <?php 
+                <?php
                 if($search && !$status){
                     $displaystatus=ucfirst($row['status']);
                     if(!strcasecmp($row['status'],'open'))
@@ -447,14 +447,14 @@ $negorder=$order=='DESC'?'ASC':'DESC'; //Negate the sorting..
                 <td class="nohover" align="center" style="background-color:<?php echo $row['priority_color']; ?>;">
                     <?php echo $row['priority_desc']; ?></td>
                 <?php
-                } 
+                }
                 ?>
                 <td nowrap>&nbsp;<?php echo $lc; ?></td>
             </tr>
             <?php
             } //end of while.
         else: //not tickets found!! set fetch error.
-            $ferror='There are no tickets here. (Leave a little early today).';  
+            $ferror='There are no tickets here. (Leave a little early today).';
         endif; ?>
     </tbody>
     <tfoot>
@@ -482,7 +482,7 @@ $negorder=$order=='DESC'?'ASC':'DESC'; //Negate the sorting..
     ?>
         <?php
          if($thisstaff->canManageTickets()) { ?>
-           <p class="centered" id="actions">  
+           <p class="centered" id="actions">
             <?php
             $status=$_REQUEST['status']?$_REQUEST['status']:$status;
             switch (strtolower($status)) {
@@ -577,7 +577,7 @@ $negorder=$order=='DESC'?'ASC':'DESC'; //Negate the sorting..
                 <?php
                 if(($mydepts = $thisstaff->getDepts()) && ($depts=Dept::getDepartments())) {
                     foreach($depts as $id =>$name) {
-                        if(!in_array($id, $mydepts)) continue; 
+                        if(!in_array($id, $mydepts)) continue;
                         echo sprintf('<option value="%d">%s</option>', $id, $name);
                     }
                 }
@@ -599,7 +599,7 @@ $negorder=$order=='DESC'?'ASC':'DESC'; //Negate the sorting..
                     }
                     echo '</OPTGROUP>';
                 }
-                
+
                 if(($teams=Team::getTeams())) {
                     echo '<OPTGROUP label="Teams ('.count($teams).')">';
                     foreach($teams as $id => $name) {

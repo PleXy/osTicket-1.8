@@ -32,9 +32,9 @@ class TicketsAjaxAPI extends AjaxController {
 
         $sql='SELECT DISTINCT ticketID, email.value AS email'
             .' FROM '.TICKET_TABLE.' ticket'
-            .' LEFT JOIN '.DYNAMIC_FORM_ENTRY_TABLE.' entry ON entry.ticket_id = ticket.ticket_id '
-            .' LEFT JOIN '.DYNAMIC_FORM_ANSWER_TABLE.' email ON email.entry_id = entry.id '
-            .' LEFT JOIN '.DYNAMIC_FORM_FIELD_TABLE.' field ON email.field_id = field.id '
+            .' LEFT JOIN '.FORM_ENTRY_TABLE.' entry ON entry.ticket_id = ticket.ticket_id '
+            .' LEFT JOIN '.FORM_ANSWER_TABLE.' email ON email.entry_id = entry.id '
+            .' LEFT JOIN '.FORM_FIELD_TABLE.' field ON email.field_id = field.id '
             .' WHERE field.name = "email"'
             .' AND ticketID LIKE \''.db_input($_REQUEST['q'], false).'%\'';
 
@@ -66,9 +66,9 @@ class TicketsAjaxAPI extends AjaxController {
 
         $sql='SELECT email.value AS email, count(ticket.ticket_id) as tickets '
             .' FROM '.TICKET_TABLE.' ticket'
-            .' JOIN '.DYNAMIC_FORM_ENTRY_TABLE.' entry ON entry.ticket_id = ticket.ticket_id '
-            .' JOIN '.DYNAMIC_FORM_ANSWER_TABLE.' email ON email.entry_id = entry.id '
-            .' JOIN '.DYNAMIC_FORM_FIELD_TABLE.' field ON email.field_id = field.id '
+            .' JOIN '.FORM_ENTRY_TABLE.' entry ON entry.ticket_id = ticket.ticket_id '
+            .' JOIN '.FORM_ANSWER_TABLE.' email ON email.entry_id = entry.id '
+            .' JOIN '.FORM_FIELD_TABLE.' field ON email.field_id = field.id '
             .' WHERE field.name = "email"'
             .' AND email.value LIKE \'%'.db_input(strtolower($_REQUEST['q']), false).'%\' ';
 

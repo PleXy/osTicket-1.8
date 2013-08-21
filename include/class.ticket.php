@@ -1676,9 +1676,9 @@ class Ticket {
             return 0;
 
         $sql ='SELECT ticket.ticket_id FROM '.TICKET_TABLE.' ticket '
-             .' LEFT JOIN '.DYNAMIC_FORM_ENTRY_TABLE.' entry ON entry.ticket_id = ticket.ticket_id '
-             .' LEFT JOIN '.DYNAMIC_FORM_ANSWER_TABLE.' email ON email.entry_id = entry.id '
-             .' LEFT JOIN '.DYNAMIC_FORM_FIELD_TABLE.' field ON email.field_id = field.id '
+             .' LEFT JOIN '.FORM_ENTRY_TABLE.' entry ON entry.ticket_id = ticket.ticket_id '
+             .' LEFT JOIN '.FORM_ANSWER_TABLE.' email ON email.entry_id = entry.id '
+             .' LEFT JOIN '.FORM_FIELD_TABLE.' field ON email.field_id = field.id '
              .' WHERE field.name = "email" AND ticket.ticketID='.db_input($extId);
 
         if($email)
@@ -1796,9 +1796,9 @@ class Ticket {
                 ON (open.ticket_id=ticket.ticket_id AND open.status=\'open\') '
             .' LEFT JOIN '.TICKET_TABLE.' closed
                 ON (closed.ticket_id=ticket.ticket_id AND closed.status=\'closed\')'
-            .' LEFT JOIN '.DYNAMIC_FORM_ENTRY_TABLE.' entry ON entry.ticket_id = ticket.ticket_id '
-            .' LEFT JOIN '.DYNAMIC_FORM_ANSWER_TABLE.' email ON email.entry_id = entry.id '
-            .' LEFT JOIN '.DYNAMIC_FORM_FIELD_TABLE.' field ON email.field_id = field.id '
+            .' LEFT JOIN '.FORM_ENTRY_TABLE.' entry ON entry.ticket_id = ticket.ticket_id '
+            .' LEFT JOIN '.FORM_ANSWER_TABLE.' email ON email.entry_id = entry.id '
+            .' LEFT JOIN '.FORM_FIELD_TABLE.' field ON email.field_id = field.id '
             .' WHERE field.name = "email" AND email.value = '.db_input($email);
 
         return db_fetch_array(db_query($sql));

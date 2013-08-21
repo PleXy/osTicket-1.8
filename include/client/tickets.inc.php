@@ -42,9 +42,9 @@ $qselect='SELECT ticket.ticket_id,ticket.ticketID,ticket.dept_id,isanswered, '
         .'dept.ispublic, subject.value as subject, name.value as name, email.value as email, '
         .'dept_name,ticket. status, ticket.source, ticket.created ';
 
-$dynfields='(SELECT entry.ticket_id, value FROM '.DYNAMIC_FORM_ANSWER_TABLE.' ans '.
-         'LEFT JOIN '.DYNAMIC_FORM_ENTRY_TABLE.' entry ON entry.id=ans.entry_id '.
-         'LEFT JOIN '.DYNAMIC_FORM_FIELD_TABLE.' field ON field.id=ans.field_id '.
+$dynfields='(SELECT entry.ticket_id, value FROM '.FORM_ANSWER_TABLE.' ans '.
+         'LEFT JOIN '.FORM_ENTRY_TABLE.' entry ON entry.id=ans.entry_id '.
+         'LEFT JOIN '.FORM_FIELD_TABLE.' field ON field.id=ans.field_id '.
          'WHERE field.name = "%1$s") %1$s ON ticket.ticket_id = %1$s.ticket_id ';
 $subject_sql = sprintf($dynfields, 'subject');
 $email_sql = sprintf($dynfields, 'email');

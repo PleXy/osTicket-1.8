@@ -26,7 +26,7 @@ require_once(INCLUDE_DIR . 'class.forms.php');
 class DynamicFormSection extends VerySimpleModel {
 
     static $meta = array(
-        'table' => DYNAMIC_FORM_SEC_TABLE,
+        'table' => FORM_SEC_TABLE,
         'ordering' => array('title'),
         'pk' => array('id'),
     );
@@ -92,7 +92,7 @@ require_once(INCLUDE_DIR . "class.json.php");
 class DynamicFormField extends VerySimpleModel {
 
     static $meta = array(
-        'table' => DYNAMIC_FORM_FIELD_TABLE,
+        'table' => FORM_FIELD_TABLE,
         'ordering' => array('sort'),
         'pk' => array('id'),
         'joins' => array(
@@ -189,7 +189,7 @@ class DynamicFormField extends VerySimpleModel {
 class DynamicFormEntry extends VerySimpleModel {
 
     static $meta = array(
-        'table' => DYNAMIC_FORM_ENTRY_TABLE,
+        'table' => FORM_ENTRY_TABLE,
         'ordering' => array('sort'),
         'pk' => array('id'),
         'joins' => array(
@@ -329,7 +329,7 @@ class DynamicFormEntry extends VerySimpleModel {
 class DynamicFormEntryAnswer extends VerySimpleModel {
 
     static $meta = array(
-        'table' => DYNAMIC_FORM_ANSWER_TABLE,
+        'table' => FORM_ANSWER_TABLE,
         'ordering' => array('field__sort'),
         'pk' => array('entry_id', 'field_id'),
         'joins' => array(
@@ -385,7 +385,7 @@ class DynamicFormEntryAnswer extends VerySimpleModel {
 class DynamicFormset extends VerySimpleModel {
 
     static $meta = array(
-        'table' => DYNAMIC_FORMSET_TABLE,
+        'table' => FORMSET_TABLE,
         'ordering' => array('title'),
         'pk' => array('id'),
     );
@@ -451,7 +451,7 @@ class DynamicFormset extends VerySimpleModel {
  */
 class DynamicFormsetSections extends VerySimpleModel {
     static $meta = array(
-        'table' => DYNAMIC_FORMSET_SEC_TABLE,
+        'table' => FORMSET_SEC_TABLE,
         'ordering' => array('sort'),
         'pk' => array('id'),
     );
@@ -485,7 +485,7 @@ class DynamicFormsetSections extends VerySimpleModel {
 class DynamicList extends VerySimpleModel {
 
     static $meta = array(
-        'table' => DYNAMIC_LIST_TABLE,
+        'table' => LIST_TABLE,
         'ordering' => array('name'),
         'pk' => array('id'),
     );
@@ -572,7 +572,7 @@ FormField::addFieldTypes(array(DynamicList, 'getSelections'));
 class DynamicListItem extends VerySimpleModel {
 
     static $meta = array(
-        'table' => DYNAMIC_LIST_ITEM_TABLE,
+        'table' => LIST_ITEM_TABLE,
         'pk' => array('id'),
         'joins' => array(
             'list' => array(

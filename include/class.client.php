@@ -42,11 +42,11 @@ class Client {
 
         $sql='SELECT ticket.ticket_id, ticketID, email.value as email, phone.value as phone '
             .' FROM '.TICKET_TABLE.' ticket '
-            .' LEFT JOIN '.DYNAMIC_FORM_ENTRY_TABLE.' entry ON entry.ticket_id = ticket.ticket_id '
-            .' LEFT JOIN '.DYNAMIC_FORM_ANSWER_TABLE.' email ON email.entry_id = entry.id '
-            .' LEFT JOIN '.DYNAMIC_FORM_FIELD_TABLE.' field1 ON email.field_id = field1.id '
-            .' LEFT JOIN '.DYNAMIC_FORM_ANSWER_TABLE.' phone ON email.entry_id = entry.id '
-            .' LEFT JOIN '.DYNAMIC_FORM_FIELD_TABLE.' field2 ON phone.field_id = field2.id '
+            .' LEFT JOIN '.FORM_ENTRY_TABLE.' entry ON entry.ticket_id = ticket.ticket_id '
+            .' LEFT JOIN '.FORM_ANSWER_TABLE.' email ON email.entry_id = entry.id '
+            .' LEFT JOIN '.FORM_FIELD_TABLE.' field1 ON email.field_id = field1.id '
+            .' LEFT JOIN '.FORM_ANSWER_TABLE.' phone ON email.entry_id = entry.id '
+            .' LEFT JOIN '.FORM_FIELD_TABLE.' field2 ON phone.field_id = field2.id '
             .' WHERE field1.name = "email" AND field2.name="phone" AND ticketID='.db_input($id);
 
         if($email)
@@ -132,9 +132,9 @@ class Client {
     /* ------------- Static ---------------*/
     function getLastTicketIdByEmail($email) {
         $sql='SELECT ticket.ticketID '.TICKET_TABLE.' ticket '
-            .' LEFT JOIN '.DYNAMIC_FORM_ENTRY_TABLE.' entry ON entry.ticket_id = ticket.ticket_id '
-            .' LEFT JOIN '.DYNAMIC_FORM_ANSWER_TABLE.' email ON email.entry_id = entry.id '
-            .' LEFT JOIN '.DYNAMIC_FORM_FIELD_TABLE.' field ON email.field_id = field.id '
+            .' LEFT JOIN '.FORM_ENTRY_TABLE.' entry ON entry.ticket_id = ticket.ticket_id '
+            .' LEFT JOIN '.FORM_ANSWER_TABLE.' email ON email.entry_id = entry.id '
+            .' LEFT JOIN '.FORM_FIELD_TABLE.' field ON email.field_id = field.id '
             .' WHERE field.name = "email" AND email.value = '.db_input($email)
             .' ORDER BY ticket.created '
             .' LIMIT 1';
