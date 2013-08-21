@@ -218,9 +218,9 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
         </tr>
        <tr>
            <td><strong>Formset</strong>:</td>
-           <td><select name="formset-id">
+           <td><select name="formset_id">
                <option value="0">&mdash; Select a Formset &mdash;</option>
-               <?php foreach (DynamicFormset::all() as $group) { ?>
+               <?php foreach (DynamicFormset::objects() as $group) { ?>
                    <option value="<?php echo $group->get('id'); ?>"
                        <?php if ($group->get('id') == $info['formset_id'])
                             echo 'selected="selected"'; ?>>
@@ -229,7 +229,7 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
                <?php } ?>
                </select>
                <em>Information for tickets associated with this help topic</em>
-               &nbsp;<span class="error">&nbsp;<?php echo $errors['formset-id']; ?></span>
+               &nbsp;<span class="error">&nbsp;<?php echo $errors['formset_id']; ?></span>
            </td>
        </tr>
         <tr>

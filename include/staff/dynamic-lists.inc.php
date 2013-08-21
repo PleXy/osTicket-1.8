@@ -7,7 +7,7 @@
 
 <?php
 $page = ($_GET['p'] && is_numeric($_GET['p'])) ? $_GET['p'] : 1;
-$count = DynamicList::count();
+$count = DynamicList::objects()->count();
 $pageNav = new Pagenate($count, $page, PAGE_LIMIT);
 $pageNav->setURL('dynamic-lists.php');
 $showing=$pageNav->showing().' dynamic lists';
@@ -24,8 +24,9 @@ $showing=$pageNav->showing().' dynamic lists';
         </tr>
     </thead>
     <tbody>
-    <?php foreach (DynamicList::all('name',
-                $pageNav->getLimit(), $pageNav->getStart() ) as $list) { ?>
+    <?php foreach (DynamicList::objects()->order_by('name')
+                ->limit($pageNav->getLimit())
+                ->offset($pageNav->getStart()) as $list) { ?>
         <tr>
             <td/>
             <td><a href="?id=<?php echo $list->get('id'); ?>"><?php echo $list->get('name'); ?></a></td>

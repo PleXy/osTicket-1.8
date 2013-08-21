@@ -30,7 +30,7 @@
             $f->render();
             if ($f->get('required')) { ?>
                 <font class="error">*</font>
-            <?php 
+            <?php
             }
             if ($f->get('hint')) { ?>
                 <br /><em style="color:gray;display:inline-block"><?php

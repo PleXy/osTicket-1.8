@@ -16,7 +16,7 @@ if($_POST) {
                     $form->set($f, $_POST[$f]);
             if ($form->isValid())
                 $form->save();
-            foreach ($form->getFields() as $field) {
+            foreach ($form->getDynamicFields() as $field) {
                 $id = $field->get('id');
                 if ($_POST["delete-$id"] == 'on') {
                     $field->delete();
@@ -60,11 +60,11 @@ if($_POST) {
                 'private'=>$_POST["private-new-$i"] == 'on' ? 1 : 0,
                 'required'=>$_POST["required-new-$i"] == 'on' ? 1 : 0
             ));
-            // XXX: Move to an instrumented list that can handle this better
-            $form->_fields[] = $field;
             if ($field->isValid())
                 $field->save();
         }
+        // XXX: Move to an instrumented list that can handle this better
+        $form->_dfields = $form->_fields = null;
     }
 }
 

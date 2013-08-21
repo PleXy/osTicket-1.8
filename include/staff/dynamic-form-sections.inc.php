@@ -7,7 +7,7 @@
 
 <?php
 $page = ($_GET['p'] && is_numeric($_GET['p'])) ? $_GET['p'] : 1;
-$count = DynamicFormSection::count();
+$count = DynamicFormSection::objects()->count();
 $pageNav = new Pagenate($count, $page, PAGE_LIMIT);
 $pageNav->setURL('dynamic-form-sections.php');
 $showing=$pageNav->showing().' form sections';
@@ -17,14 +17,15 @@ $showing=$pageNav->showing().' form sections';
     <caption><?php echo $showing; ?></caption>
     <thead>
         <tr>
-            <th width="7">&nbsp;</th>        
+            <th width="7">&nbsp;</th>
             <th>Title</th>
             <th>Last Updated</th>
         </tr>
     </thead>
     <tbody>
-    <?php foreach (DynamicFormSection::all('title',
-                $pageNav->getLimit(), $pageNav->getStart()) as $form) { ?>
+    <?php foreach (DynamicFormSection::objects()->order_by('title')
+                ->limit($pageNav->getLimit())
+                ->offset($pageNav->getStart()) as $form) { ?>
         <tr>
             <td/>
             <td><a href="?id=<?php echo $form->get('id'); ?>"><?php echo $form->get('title'); ?></a></td>

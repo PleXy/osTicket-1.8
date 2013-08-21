@@ -1679,7 +1679,7 @@ class Ticket {
              .' LEFT JOIN '.DYNAMIC_FORM_ENTRY_TABLE.' entry ON entry.ticket_id = ticket.ticket_id '
              .' LEFT JOIN '.DYNAMIC_FORM_ANSWER_TABLE.' email ON email.entry_id = entry.id '
              .' LEFT JOIN '.DYNAMIC_FORM_FIELD_TABLE.' field ON email.field_id = field.id '
-             .' WHERE field.name = "email" AND ticeket.ticketID='.db_input($extId);
+             .' WHERE field.name = "email" AND ticket.ticketID='.db_input($extId);
 
         if($email)
             $sql .= ' AND email.value = '.db_input($email);

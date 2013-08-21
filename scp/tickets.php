@@ -449,7 +449,7 @@ if($_POST && !$errors):
                 $topic=Topic::lookup($_POST['topicId']);
                 $forms=DynamicFormset::lookup($topic->ht['formset_id'])->getForms();
                 foreach ($forms as $idx=>$f) {
-                    $form=$f->getForm()->instanciate();
+                    $form=$f->getForm()->instanciate($f->sort);
                     # Collect name, email, and subject address for banning and such
                     foreach ($form->getAnswers() as $answer) {
                         $fname = $answer->getField()->get('name');

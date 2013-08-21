@@ -13,21 +13,24 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
         <tr>
             <th colspan="2">
                 <h4>New Ticket</h4>
-                <em><strong>User Information</strong></em>
             </th>
         </tr>
     </thead>
     <tbody>
-        <?php 
-        if($cfg->notifyONNewStaffTicket()) { ?>
+    <?php
+    if($cfg->notifyONNewStaffTicket()) { ?>
         <tr>
+            <th>
+            <em><strong>User Information</strong></em>
+            </th>
+        </tr>
             <td width="160">Alert:</td>
             <td>
             &nbsp;&nbsp;&nbsp;
             <input type="checkbox" name="alertuser" <?php echo (!$errors || $info['alertuser'])? 'checked="checked"': ''; ?>>Send alert to user.
             </td>
         </tr>
-            <?php 
+            <?php
              } ?>
         <tr>
             <th colspan="2">
@@ -242,8 +245,8 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
                                 foreach($info['cannedattachments'] as $k=>$id) {
                                     if(!($file=AttachmentFile::lookup($id))) continue;
                                     $hash=$file->getHash().md5($file->getId().session_id().$file->getHash());
-                                    echo sprintf('<label><input type="checkbox" name="cannedattachments[]" 
-                                            id="f%d" value="%d" checked="checked" 
+                                    echo sprintf('<label><input type="checkbox" name="cannedattachments[]"
+                                            id="f%d" value="%d" checked="checked"
                                             <a href="file.php?h=%s">%s</a>&nbsp;&nbsp;</label>&nbsp;',
                                             $file->getId(), $file->getId() , $hash, $file->getName());
                                 }

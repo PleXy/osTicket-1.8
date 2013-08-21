@@ -98,7 +98,7 @@ class TicketApiController extends ApiController {
         $topic=Topic::lookup($data['topicId']);
         $forms=DynamicFormset::lookup($topic->ht['formset_id'])->getForms();
         foreach ($forms as $idx=>$f) {
-            $forms[$idx] = $form = $f->getForm()->instanciate();
+            $forms[$idx] = $form = $f->getForm()->instanciate($f->sort);
             # Collect name, email address, and subject for banning and such
             foreach ($form->getFields() as $field) {
                 $fname = $field->get('name');

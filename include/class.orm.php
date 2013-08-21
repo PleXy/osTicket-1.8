@@ -23,6 +23,10 @@ class VerySimpleModel {
         'pk' => false
     );
 
+    var $ht;
+    var $dirty;
+    var $__new__ = false;
+
     function __construct($row) {
         $this->ht = $row;
         $this->dirty = array();
@@ -32,10 +36,17 @@ class VerySimpleModel {
         return $this->ht[$field];
     }
     function __get($field) {
-        return $this->ht[$field];
+        if (array_key_exists($field, $this->ht))
+            return $this->ht[$field];
+        return $this->{$field};
     }
 
     function set($field, $value) {
+        // XXX: Fully support or die if updating pk
+        // XXX: The contents of $this->dirty should be the value after the
+        // previous fetch or save. For instance, if the value is changed more
+        // than once, the original value should be preserved in the dirty list
+        // on the second edit.
         $old = isset($this->ht[$field]) ? $this->ht[$field] : null;
         if ($old != $value) {
             $this->dirty[$field] = $old;
@@ -61,11 +72,12 @@ class VerySimpleModel {
         return new QuerySet(get_called_class());
     }
 
-    static function lookup($where) {
-        if (!is_array($where))
+    static function lookup($criteria) {
+        if (!is_array($criteria))
             // Model::lookup(1), where >1< is the pk value
-            $where = array(static::$meta['pk'][0] => $where);
-        $list = static::find($where, false, 1);
+            $criteria = array(static::$meta['pk'][0] => $criteria);
+        $list = static::objects()->filter($criteria)->limit(1);
+        // TODO: Throw error if more than one result from database
         return $list[0];
     }
 
@@ -82,43 +94,49 @@ class VerySimpleModel {
         return db_affected_rows(db_query($sql)) == 1;
     }
 
-    function save($pk=false, $refetch=false) {
-        if (!$pk) $pk = static::$meta['pk'];
+    function save($refetch=false) {
+        $pk = static::$meta['pk'];
         if (!$this->isValid())
             return false;
         if (!is_array($pk)) $pk=array($pk);
         if ($this->__new__)
-            $sql = 'INSERT INTO '.$table;
+            $sql = 'INSERT INTO '.static::$meta['table'];
         else
-            $sql = 'UPDATE '.$table;
+            $sql = 'UPDATE '.static::$meta['table'];
         $filter = $fields = array();
         if (count($this->dirty) === 0)
             return;
         foreach ($this->dirty as $field=>$old)
             if ($this->__new__ or !in_array($field, $pk))
-                if (@get_class($model->get($field)) == 'SqlFunction')
-                    $fields[] = $field.' = '.$model->get($field)->toSql();
+                if (@get_class($this->get($field)) == 'SqlFunction')
+                    $fields[] = $field.' = '.$this->get($field)->toSql();
                 else
-                    $fields[] = $field.' = '.input($model->get($field));
+                    $fields[] = $field.' = '.db_input($this->get($field));
         foreach ($pk as $p)
-            $filter[] = $p.' = '.db_input($model->get($p));
+            $filter[] = $p.' = '.db_input($this->get($p));
         $sql .= ' SET '.implode(', ', $fields);
         if (!$this->__new__) {
             $sql .= ' WHERE '.implode(' AND ', $filter);
             $sql .= ' LIMIT 1';
         }
-        if (db_affected_rows(db_query($sql)) != 1)
+        if (db_affected_rows(db_query($sql)) != 1) {
+            throw new Exception(db_error());
             return false;
-        if ($this->__new__ && count($pk) == 1) {
-            $this->ht[$pk[0]] = db_insert_id();
+        }
+        if ($this->__new__) {
+            if (count($pk) == 1)
+                $this->ht[$pk[0]] = db_insert_id();
             $this->__new__ = false;
         }
         # Refetch row from database
         # XXX: Too much voodoo
-        if ($refetch)
+        if ($refetch) {
             # XXX: Support composite PK
-            $this->ht = static::lookup(
-                array($pk[0] => $this->get($pk[0])))->ht;
+            $criteria = array($pk[0] => $this->get($pk[0]));
+            $self = static::lookup($criteria);
+            $this->ht = $self->ht;
+        }
+        $this->dirty = array();
         return $this->get($pk[0]);
     }
 
@@ -128,7 +146,8 @@ class VerySimpleModel {
         $i = new $class(array());
         $i->__new__ = true;
         foreach ($ht as $field=>$value)
-            $i->set($field, $value);
+            if (!is_array($value))
+                $i->set($field, $value);
         return $i;
     }
 
@@ -156,7 +175,7 @@ class SqlFunction {
     }
 }
 
-class QuerySet {
+class QuerySet implements IteratorAggregate, ArrayAccess {
     var $model;
 
     var $constraints = array();
@@ -169,6 +188,9 @@ class QuerySet {
 
     var $compiler = 'MySqlCompiler';
     var $iterator = 'ModelInstanceIterator';
+
+    var $params;
+    var $query;
 
     function __construct($model) {
         $this->model = $model;
@@ -211,32 +233,38 @@ class QuerySet {
         return $this;
     }
 
-    function all($sort=false, $limit=false, $offset=false) {
-        self::find(false, $sort, $limit, $offset);
+    function all() {
         return $this->getIterator()->asArray();
     }
 
-    function find($where=false, $sort=false, $limit=false, $offset=false) {
-        // TODO: Stash parameters and return clone or self
-        if ($where)
-            $this->filter($where);
-        if ($sort)
-            $this->order_by($sort);
-        if ($limit)
-            $this->limit($limit);
-        if ($offset)
-            $this->offset($offset);
-        return $this;
+    function count() {
+        $compiler = new $this->compiler();
+        return $compiler->compileCount($this);
     }
 
+    // IteratorAggregate interface
     function getIterator() {
         if (!isset($this->_iterator))
-            $this->_iterator = new $this->iterator($this, $this->getQuery());
+            $this->_iterator = new $this->iterator($this);
         return $this->_iterator;
     }
 
+    // ArrayAccess interface
+    function offsetExists($offset) {
+        return $this->getIterator()->offsetExists($offset);
+    }
+    function offsetGet($offset) {
+        return $this->getIterator()->offsetGet($offset);
+    }
+    function offsetUnset($a) {
+        throw new Exception('QuerySet is read-only');
+    }
+    function offsetSet($a, $b) {
+        throw new Exception('QuerySet is read-only');
+    }
+
     function __toString() {
-        return $this->getQuery();
+        return (string)$this->getQuery();
     }
 
     function getQuery() {
@@ -251,21 +279,20 @@ class QuerySet {
         $compiler = new $this->compiler();
         $this->query = $compiler->compileSelect($this);
 
-        var_dump($compiler->params);
         return $this->query;
     }
 }
 
-class ModelInstanceIterator implements Iterator {
+class ModelInstanceIterator implements Iterator, ArrayAccess {
     var $model;
     var $resource;
     var $cache = array();
     var $position = 0;
     var $queryset;
 
-    function __construct($queryset, $query) {
+    function __construct($queryset) {
         $this->model = $queryset->model;
-        $this->resource = db_query($query);
+        $this->resource = $queryset->getQuery();
     }
 
     function buildModel($row) {
@@ -274,10 +301,11 @@ class ModelInstanceIterator implements Iterator {
     }
 
     function fillTo($index) {
-        while ($this->resource && $index > count($this->cache)) {
-            if ($row = db_fetch_array($this->resource)) {
+        while ($this->resource && $index >= count($this->cache)) {
+            if ($row = $this->resource->next()) {
                 $this->cache[] = $this->buildModel($row);
             } else {
+                $this->resource->close();
                 $this->resource = null;
                 break;
             }
@@ -294,7 +322,7 @@ class ModelInstanceIterator implements Iterator {
         $this->position = 0;
     }
     function current() {
-        $this->fillTo($this->position); 
+        $this->fillTo($this->position);
         return $this->cache[$this->position];
     }
     function key() {
@@ -307,6 +335,22 @@ class ModelInstanceIterator implements Iterator {
         $this->fillTo($this->position);
         return count($this->cache) > $this->position;
     }
+
+    // ArrayAccess interface
+    function offsetExists($offset) {
+        $this->fillTo($offset);
+        return $this->position >= $offset;
+    }
+    function offsetGet($offset) {
+        $this->fillTo($offset);
+        return $this->cache[$offset];
+    }
+    function offsetUnset($a) {
+        throw new Exception(sprintf('%s is read-only', get_class($this)));
+    }
+    function offsetSet($a, $b) {
+        throw new Exception(sprintf('%s is read-only', get_class($this)));
+    }
 }
 
 class MySqlCompiler {
@@ -314,11 +358,17 @@ class MySqlCompiler {
 
     static $operators = array(
         'exact' => '%1$s = %2$s',
-        'contains' => ' %1$s LIKE %2$s',
+        'contains' => array('self', '__contains'),
         'gt' => '%1$s > %2$s',
         'lt' => '%1$s < %2$s',
         'isnull' => '%1$s IS NULL',
+        'like' => '%1$s LIKE %2$s',
     );
+
+    function __contains($a, $b) {
+        # {%a} like %{$b}%
+        return sprintf('%s LIKE %s', $a, $this->input("%$b%"));
+    }
 
     function _get_joins_and_field($field, $model, $options=array()) {
         $joins = array();
@@ -355,7 +405,7 @@ class MySqlCompiler {
         if (isset($options['table']) && $options['table'])
             $field = $this->quote($model::$meta['table']);
         elseif ($table)
-            $field = $this->quote($table).'.'.$this->quote($field);
+            $field = $this->quote($model::$meta['table']).'.'.$this->quote($field);
         else
             $field = $this->quote($field);
         return array($joins, $field, $operator);
@@ -369,7 +419,12 @@ class MySqlCompiler {
             foreach ($constraint as $field=>$value) {
                 list($js, $field, $op) = self::_get_joins_and_field($field, $model);
                 $joins = array_merge($joins, $js);
-                $filter[] = sprintf($op, $field, $this->input($value));
+                // Allow operators to be callable rather than sprintf
+                // strings
+                if (is_callable($op))
+                    $filter[] = $op($field, $value);
+                else
+                    $filter[] = sprintf($op, $field, $this->input($value));
             }
             // Multiple constraints here are ANDed together
             $constraints[] = implode(' AND ', $filter);
@@ -397,13 +452,29 @@ class MySqlCompiler {
     function compileCount($queryset) {
         $model = $queryset->model;
         $table = $model::$meta['table'];
-        if ($where) {
-            list($joins, $filter) = static::_compile_where($where);
-            $where = ' WHERE ' . implode(' AND ', $filter);
-            $joins = implode('', array_unique($joins));
+        $where_pos = array();
+        $where_neg = array();
+        $joins = array();
+        foreach ($queryset->constraints as $where) {
+            list($_joins, $filter) = $this->_compile_where($where, $model);
+            $where_pos[] = $filter;
+            $joins = array_merge($joins, $_joins);
         }
-        $sql = 'SELECT COUNT(*) FROM '.$this->quote($table).$joins.$where;
-        return db_count($sql);
+        foreach ($queryset->exclusions as $where) {
+            list($_joins, $filter) = $this->_compile_where($where, $model);
+            $where_neg[] = $filter;
+            $joins = array_merge($joins, $_joins);
+        }
+
+        $where = '';
+        if ($where_pos || $where_neg) {
+            $where = ' WHERE '.implode(' AND ', $where_pos)
+                .implode(' AND NOT ', $where_neg);
+        }
+        $sql = 'SELECT COUNT(*) AS count FROM '.$this->quote($table).$joins.$where;
+        $exec = new MysqlExecutor($sql, $this->params);
+        $row = $exec->next();
+        return $row['count'];
     }
 
     function compileSelect($queryset) {
@@ -470,11 +541,11 @@ class MySqlCompiler {
         $sql = 'SELECT '.implode(', ', $fields).' FROM '
             .$this->quote($table).$joins.$where.$sort;
         if ($queryset->limit)
-            $sql .= ' LIMIT '.$limit;
+            $sql .= ' LIMIT '.$queryset->limit;
         if ($queryset->offset)
-            $sql .= ' OFFSET '.$offset;
+            $sql .= ' OFFSET '.$queryset->offset;
 
-        return $sql;
+        return new MysqlExecutor($sql, $this->params);
     }
 
     function compileUpdate() {
@@ -482,12 +553,96 @@ class MySqlCompiler {
 
     function compileInsert() {
     }
-    
+
     function compileDelete() {
     }
 
     // Returns meta data about the table used to build queries
     function inspectTable($table) {
+    }
+}
+
+class MysqlExecutor {
+
+    var $stmt;
+    var $result;
+    var $output;
+
+    var $sql;
+    var $params;
+
+    function __construct($sql, $params) {
+        $this->sql = $sql;
+        $this->params = $params;
+    }
+
+    function _prepare() {
+        if (!($this->stmt = db_prepare($this->sql)))
+            throw new Exception('Unable to prepare query: '.db_error().'
+            '.$this->sql);
+        if (count($this->params))
+            $this->_bind($this->params);
+        $this->stmt->execute();
+        $this->_setup_output();
+        $this->stmt->store_result();
+    }
+
+    function _bind($params) {
+        if (count($params) != $this->stmt->param_count)
+            throw new Exception('Parameter count does not match query');
+
+        $types = '';
+        $ps = array();
+        foreach ($params as $p) {
+            if (is_int($p))
+                $types .= 'i';
+            elseif (is_string($p))
+                $types .= 's';
+            $ps[] = &$p;
+        }
+        array_unshift($ps, $types);
+        call_user_func_array(array($this->stmt,'bind_param'), $ps);
+    }
+
+    function _setup_output() {
+        $this->output = array();
+        $variables = array();
+        $meta = $this->stmt->result_metadata();
+
+        while($field = $meta->fetch_field())
+            $variables[] = &$this->output[$field->name]; // pass by reference
+
+        call_user_func_array(array($this->stmt, 'bind_result'), $variables);
+    }
+
+    // Iterator interface
+    function rewind() {
+        if (!isset($this->stmt))
+            $this->_prepare();
+        $this->stmt->data_seek(0);
+    }
+    function next() {
+        if (!isset($this->stmt))
+            $this->_prepare();
+        $status = $this->stmt->fetch();
+        if ($status === false)
+            throw new Exception($this->stmt->error_list . db_error());
+        elseif ($status === null) {
+            $this->close();
+            return false;
+        }
+        return unserialize(serialize($this->output));
+    }
+    function close() {
+        if (!$this->stmt)
+            return;
+
+        $this->stmt->close();
+        $this->stmt = null;
+    }
+
+    function __toString() {
+        return $this->sql;
     }
 }
 ?>

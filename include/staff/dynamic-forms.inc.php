@@ -7,7 +7,7 @@
 
 <?php
 $page = ($_GET['p'] && is_numeric($_GET['p'])) ? $_GET['p'] : 1;
-$count = DynamicFormset::count();
+$count = DynamicFormset::objects()->count();
 $pageNav = new Pagenate($count, $page, PAGE_LIMIT);
 $pageNav->setURL('dynamic-lists.php');
 $showing=$pageNav->showing().' dynamic forms';
@@ -17,14 +17,15 @@ $showing=$pageNav->showing().' dynamic forms';
     <caption><?php echo $showing; ?></caption>
     <thead>
         <tr>
-            <th width="7">&nbsp;</th>        
+            <th width="7">&nbsp;</th>
             <th>Title</th>
             <th>Last Updated</th>
         </tr>
     </thead>
     <tbody>
-    <?php foreach (DynamicFormset::all('title',
-                $pageNav->getLimit(), $pageNav->getStart()) as $form) { ?>
+    <?php foreach (DynamicFormset::objects()->order_by('title')
+                ->limit($pageNav->getLimit())
+                ->offset($pageNav->getStart()) as $form) { ?>
         <tr>
             <td/>
             <td><a href="?id=<?php echo $form->get('id'); ?>"><?php echo $form->get('title'); ?></a></td>

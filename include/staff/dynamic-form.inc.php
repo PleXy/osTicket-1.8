@@ -48,7 +48,7 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
     </tbody>
     <tbody>
        <tr><th>Delete | Sort</th><th>Form name</th></tr>
-       <?php if ($group) foreach ($group->getForms() as $formatt) { 
+       <?php if ($group) foreach ($group->getForms() as $formatt) {
            $form = $formatt->getForm();
            $errors = $formatt->errors(); ?>
            <tr>
@@ -60,7 +60,7 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
                     ?></font>
                </td><td>
                    <select name="section_id-<?php echo $formatt->get('id'); ?>">
-                   <?php foreach (DynamicFormSection::all() as $form) { ?>
+                   <?php foreach (DynamicFormSection::objects() as $form) { ?>
                        <option value="<?php echo $form->get('id'); ?>" <?php
                             if ($formatt->get('section_id') == $form->get('id'))
                                 echo 'selected="selected"'; ?>>
@@ -74,7 +74,7 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
                             > Edit</a>
                </td>
            </tr>
-       <?php } 
+       <?php }
        for ($i=0; $i<$newcount; $i++) { ?>
        <tr>
            <td><em>add</em>
@@ -82,7 +82,7 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
            </td><td>
                <select name="section_id-new-<?php echo $i; ?>">
                    <option value="0">&mdash; Select Form &mdash;</option>
-               <?php foreach (DynamicFormSection::all() as $form) { ?>
+               <?php foreach (DynamicFormSection::objects() as $form) { ?>
                    <option value="<?php echo $form->get('id'); ?>">
                        <?php echo $form->get('title'); ?>
                    </option>

@@ -69,7 +69,7 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
         </tr>
     </thead>
     <tbody>
-    <?php if ($form) foreach ($form->getFields() as $f) { 
+    <?php if ($form) foreach ($form->getFields() as $f) {
         $id = $f->get('id');
         $errors = $f->errors(); ?>
         <tr>
@@ -84,7 +84,7 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
             <td><input type="text" size="32" name="label-<?php echo $id; ?>"
                 value="<?php echo $f->get('label'); ?>"/></td>
             <td><select name="type-<?php echo $id; ?>">
-                <?php foreach (get_dynamic_field_types() as $type=>$nfo) { ?>
+                <?php foreach (FormField::allTypes() as $type=>$nfo) { ?>
                 <option value="<?php echo $type; ?>" <?php
                     if ($f->get('type') == $type) echo 'selected="selected"'; ?>>
                     <?php echo $nfo[0]; ?></option>
@@ -114,14 +114,14 @@ $info=Format::htmlchars(($errors && $_POST)?$_POST:$info);
                 <?php if ($f->get('required')) echo 'checked="checked"'; ?>/></td>
         </tr>
     <?php
-    } 
+    }
     for ($i=0; $i<$newcount; $i++) { ?>
             <td><em>add</em></td>
             <td><input type="text" size="4" name="sort-new-<?php echo $i; ?>"/></td>
             <td><input type="text" size="32" name="label-new-<?php echo $i; ?>"/></td>
             <td><select name="type-new-<?php echo $i; ?>">
-                <?php foreach (get_dynamic_field_types() as $type=>$nfo) { ?>
-                <option value="<?php echo $type; ?>"> 
+                <?php foreach (FormField::allTypes() as $type=>$nfo) { ?>
+                <option value="<?php echo $type; ?>">
                     <?php echo $nfo[0]; ?></option>
                 <?php } ?>
             </select></td>

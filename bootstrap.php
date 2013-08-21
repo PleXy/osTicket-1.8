@@ -107,16 +107,16 @@ define('TICKET_EMAIL_INFO_TABLE',$prefix.'ticket_email_info');
 define('TICKET_PRIORITY_TABLE',$prefix.'ticket_priority');
 define('PRIORITY_TABLE',TICKET_PRIORITY_TABLE);
 
-define('DYNAMIC_FORM_SEC_TABLE',TABLE_PREFIX.'dynamic_form_section');
-define('DYNAMIC_FORM_FIELD_TABLE',TABLE_PREFIX.'dynamic_form_field');
-define('DYNAMIC_FORMSET_TABLE',TABLE_PREFIX.'dynamic_formset');
-define('DYNAMIC_FORMSET_SEC_TABLE',TABLE_PREFIX.'dynamic_formset_sections');
+define('DYNAMIC_FORM_SEC_TABLE',$prefix.'dynamic_form_section');
+define('DYNAMIC_FORM_FIELD_TABLE',$prefix.'dynamic_form_field');
+define('DYNAMIC_FORMSET_TABLE',$prefix.'dynamic_formset');
+define('DYNAMIC_FORMSET_SEC_TABLE',$prefix.'dynamic_formset_sections');
 
-define('DYNAMIC_LIST_TABLE',TABLE_PREFIX.'dynamic_list');
-define('DYNAMIC_LIST_ITEM_TABLE',TABLE_PREFIX.'dynamic_list_items');
+define('DYNAMIC_LIST_TABLE',$prefix.'dynamic_list');
+define('DYNAMIC_LIST_ITEM_TABLE',$prefix.'dynamic_list_items');
 
-define('DYNAMIC_FORM_ENTRY_TABLE',TABLE_PREFIX.'dynamic_form_entry');
-define('DYNAMIC_FORM_ANSWER_TABLE',TABLE_PREFIX.'dynamic_form_entry_values');
+define('DYNAMIC_FORM_ENTRY_TABLE',$prefix.'dynamic_form_entry');
+define('DYNAMIC_FORM_ANSWER_TABLE',$prefix.'dynamic_form_entry_values');
 
 define('TOPIC_TABLE',$prefix.'help_topic');
 define('SLA_TABLE', $prefix.'sla');

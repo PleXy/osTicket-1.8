@@ -28,16 +28,29 @@ class DynamicFormSection extends VerySimpleModel {
     static $meta = array(
         'table' => DYNAMIC_FORM_SEC_TABLE,
         'ordering' => array('title'),
+        'pk' => array('id'),
     );
 
+    var $_fields;
+    var $_dfields;
+
     function getFields() {
-        if (!$this->_fields) {
+        if (!isset($this->_fields)) {
             $this->_fields = array();
-            foreach (DynamicFormField::objects()->filter(array('section_id'=>$this->id)) as $f)
+            foreach ($this->getDynamicFields() as $f)
                 $this->_fields[] = $f->getImpl();
         }
         return $this->_fields;
     }
+
+    function getDynamicFields() {
+        if (!isset($this->_dfields))
+            $this->_dfields = DynamicFormField::objects()
+                ->filter(array('section_id'=>$this->id))
+                ->all();
+        return $this->_dfields;
+    }
+
     function getTitle() { return $this->get('title'); }
     function getInstructions() { return $this->get('instructions'); }
 
@@ -48,26 +61,28 @@ class DynamicFormSection extends VerySimpleModel {
         return new Form($fields, $this->title, $this->instructions);
     }
 
-    function instanciate() {
+    function instanciate($sort=1) {
         return DynamicFormEntry::create(array(
-            'section_id'=>$this->get('id'), 'sort'=>$this->get('sort')));
-    }
-
-    static function lookup($id) {
-        return ($id && is_numeric($id)
-            && ($r=parent::lookup(array('id'=>$id)))
-            && $r->get('id')==$id)?$r:null;
+            'section_id'=>$this->get('id'), 'sort'=>$sort));
     }
 
     function save() {
         if (count($this->dirty))
             $this->set('updated', new SqlFunction('NOW'));
-        return parent::save(true);
+        return parent::save();
     }
 
     static function create($ht=false) {
         $inst = parent::create($ht);
         $inst->set('created', new SqlFunction('NOW'));
+        if (isset($ht['fields'])) {
+            $inst->save();
+            foreach ($ht['fields'] as $f) {
+                $f = DynamicFormField::create($f);
+                $f->section_id = $inst->id;
+                $f->save();
+            }
+        }
         return $inst;
     }
 }
@@ -75,70 +90,34 @@ class DynamicFormSection extends VerySimpleModel {
 require_once(INCLUDE_DIR . "class.json.php");
 
 class DynamicFormField extends VerySimpleModel {
-    
+
     static $meta = array(
         'table' => DYNAMIC_FORM_FIELD_TABLE,
         'ordering' => array('sort'),
         'pk' => array('id'),
         'joins' => array(
             'form' => array(
-                'type' => 'left',
-                'constraint' => array('form_id' => 'DynamicFormSection.id'),
+                'null' => true,
+                'constraint' => array('section_id' => 'DynamicFormSection.id'),
             ),
-            'sla' => array('sla_id' => 'Sla.id'),
         ),
     );
 
-    /**
-     * getClean
-     *
-     * Validates and cleans inputs from POST request. This is performed on a
-     * field instance, after a DynamicFormSet / DynamicFormSection is
-     * submitted via POST, in order to kick off parsing and validation of
-     * user-entered data.
-     */
-    function getClean() {
-        $value = $this->getWidget()->value;
-        $value = $this->parse($value);
-        $this->validateEntry($value);
-        return $value;
+    var $_field;
+
+    // Multiple inheritance -- delegate to FormField
+    function __call($what, $args) {
+        return call_user_func_array(
+            array($this->getField(), $what), $args);
     }
 
-    function errors() {
-        if (!$this->_errors) return array();
-        else return $this->_errors;
-    }
-
-    /**
-     * isValid
-     *
-     * Validates the contents of $this->ht before the model should be
-     * committed to the database. This is the validation for the field
-     * template -- edited in the admin panel for a form section.
-     */
-    function isValid() {
-        if (!is_numeric($this->get('sort')))
-            $this->_errors['sort'] = 'Enter a number';
-        if (strpos($this->get('name'), ' ') !== false)
-            $this->_errors['name'] = 'Name cannot contain spaces';
-        return count($this->errors()) === 0;
+    function getField() {
+        if (!isset($this->_field))
+            $this->_field = new FormField($this->ht);
+        return $this->_field;
     }
 
     function getAnswer() { return $this->answer; }
-
-    function getConfigurationOptions() {
-        return array();
-    }
-
-    function getConfigurationForm() {
-        if (!$this->_cform) {
-            $types = get_dynamic_field_types();
-            $clazz = $types[$this->get('type')][1];
-            $T = new $clazz();
-            $this->_cform = $T->getConfigurationOptions();
-        }
-        return $this->_cform;
-    }
 
     /**
      * setConfiguration
@@ -171,33 +150,6 @@ class DynamicFormField extends VerySimpleModel {
         return count($errors) === 0;
     }
 
-    /**
-     * getConfiguration
-     *
-     * Loads configuration information from database into hashtable format.
-     * Also, the defaults from ::getConfigurationOptions() are integrated
-     * into the database-backed options, so that if options have not yet
-     * been set or a new option has been added and not saved for this field,
-     * the default value will be reflected in the returned configuration.
-     */
-    function getConfiguration() {
-        if (!$this->_config) {
-            $this->_config = $this->get('configuration');
-            if (is_string($this->_config))
-                $this->_config = JsonDataParser::parse($this->_config);
-            elseif (!$this->_config)
-                $this->_config = array();
-            foreach ($this->getConfigurationOptions() as $name=>$field)
-                if (!isset($this->_config[$name]))
-                    $this->_config[$name] = $field->get('default');
-        }
-        return $this->_config;
-    }
-
-    function isConfigurable() {
-        return true;
-    }
-
     function delete() {
         // Don't really delete form fields as that will screw up the data
         // model. Instead, just drop the association with the form section
@@ -218,6 +170,8 @@ class DynamicFormField extends VerySimpleModel {
     static function create($ht=false) {
         $inst = parent::create($ht);
         $inst->set('created', new SqlFunction('NOW'));
+        if (isset($ht['configuration']))
+            $inst->configuration = JsonDataEncoder::encode($ht['configuration']);
         return $inst;
     }
 }
@@ -237,18 +191,24 @@ class DynamicFormEntry extends VerySimpleModel {
     static $meta = array(
         'table' => DYNAMIC_FORM_ENTRY_TABLE,
         'ordering' => array('sort'),
+        'pk' => array('id'),
         'joins' => array(
             'form' => array(
                 'null' => true,
-                'constraint' => array('form_id' => 'DynamicFormSection.id'),
+                'constraint' => array('section_id' => 'DynamicFormSection.id'),
             ),
         ),
     );
 
+    var $_values;
+    var $_fields;
+    var $_form;
+
     function getAnswers() {
-        if (!$this->_values) {
-            $this->_values = DynamicFormEntryAnswer::objects()->filter(
-                array('entry_id'=>$this->get('id')));
+        if (!isset($this->_values)) {
+            $this->_values = DynamicFormEntryAnswer::objects()
+                ->filter(array('entry_id'=>$this->get('id')))
+                ->all();
             foreach ($this->_values as $v)
                 $v->entry = $this;
         }
@@ -305,7 +265,7 @@ class DynamicFormEntry extends VerySimpleModel {
     }
 
     function forTicket($ticket_id) {
-        return self::objects()->filter(array('ticket_id'=>$ticket_id));
+        return DynamicFormEntry::objects()->filter(array('ticket_id'=>$ticket_id));
     }
 
     /**
@@ -327,10 +287,11 @@ class DynamicFormEntry extends VerySimpleModel {
             if (!$found) {
                 # Section ID is auto set in the ::save method
                 $a = DynamicFormEntryAnswer::create(
-                    array('field_id'=>$field->get('id')));
+                    array('field_id'=>$field->get('id'), 'entry_id'=>$this->id));
                 $a->field = $field;
                 // Add to list of answers
                 $this->_values[] = $a;
+                $a->save();
             }
         }
     }
@@ -338,7 +299,7 @@ class DynamicFormEntry extends VerySimpleModel {
     function save() {
         if (count($this->dirty))
             $this->set('updated', new SqlFunction('NOW'));
-        parent::save('id');
+        parent::save();
         foreach ($this->getAnswers() as $a) {
             $a->set('value', $a->getField()->to_database($a->getField()->getClean()));
             $a->set('entry_id', $this->get('id'));
@@ -368,14 +329,23 @@ class DynamicFormEntry extends VerySimpleModel {
 class DynamicFormEntryAnswer extends VerySimpleModel {
 
     static $meta = array(
-        'table' => DYNAMIC_FORM_FIELD_TABLE,
+        'table' => DYNAMIC_FORM_ANSWER_TABLE,
         'ordering' => array('field__sort'),
         'pk' => array('entry_id', 'field_id'),
         'joins' => array(
-            'field' => array('field_id' => 'DynamicFormField.id'),
-            'entry' => array('entry_id' => 'DynamicFormEntry.id'),
+            'field' => array(
+                'constraint' => array('field_id' => 'DynamicFormField.id'),
+            ),
+            'entry' => array(
+                'constraint' => array('entry_id' => 'DynamicFormEntry.id'),
+            ),
         ),
     );
+
+    var $field;
+    var $form;
+    var $entry;
+    var $_value;
 
     function getEntry() {
         return $this->entry;
@@ -388,16 +358,11 @@ class DynamicFormEntryAnswer extends VerySimpleModel {
     }
 
     function getField() {
-        if (!$this->field) {
+        if (!isset($this->field)) {
             $this->field = DynamicFormField::lookup($this->get('field_id'))->getImpl();
             $this->field->answer = $this;
         }
         return $this->field;
-    }
-
-    function getJoins() {
-        return array(
-        );
     }
 
     function getValue() {
@@ -425,10 +390,12 @@ class DynamicFormset extends VerySimpleModel {
         'pk' => array('id'),
     );
 
+    var $_forms;
+
     function getForms() {
-        if (!$this->_forms)
+        if (!isset($this->_forms))
             $this->_forms = DynamicFormsetSections::objects()->filter(
-                    array('formset_id'=>$this->get('id')));
+                    array('formset_id'=>$this->id))->all();
         return $this->_forms;
     }
 
@@ -457,6 +424,23 @@ class DynamicFormset extends VerySimpleModel {
     static function create($ht=false) {
         $inst = parent::create($ht);
         $inst->set('created', new SqlFunction('NOW'));
+        if (isset($ht['sections'])) {
+            $inst->save();
+            foreach ($ht['sections'] as $s) {
+                $sort = 1;
+                if (isset($s['sort'])) {
+                    $sort = $s['sort'];
+                    unset($s['sort']);
+                }
+                $sec = DynamicFormSection::create($s);
+                $sec->save();
+                DynamicFormsetSections::create(array(
+                    'formset_id' => $inst->id,
+                    'section_id' => $sec->id,
+                    'sort' => $sort
+                ))->save();
+            }
+        }
         return $inst;
     }
 }
@@ -472,8 +456,10 @@ class DynamicFormsetSections extends VerySimpleModel {
         'pk' => array('id'),
     );
 
+    var $_section;
+
     function getForm() {
-        if (!$this->_section)
+        if (!isset($this->_section))
             $this->_section = DynamicFormSection::lookup($this->get('section_id'));
         return $this->_section;
     }
@@ -501,7 +487,10 @@ class DynamicList extends VerySimpleModel {
     static $meta = array(
         'table' => DYNAMIC_LIST_TABLE,
         'ordering' => array('name'),
+        'pk' => array('id'),
     );
+
+    var $_items;
 
     function getSortModes() {
         return array(
@@ -530,14 +519,18 @@ class DynamicList extends VerySimpleModel {
         if (!$this->_items) {
             $this->_items = DynamicListItem::objects()->filter(
                     array('list_id'=>$this->get('id')))
-                ->order_by($this->getListOrderBy())
-                ->limit($limit);
+                ->order_by($this->getListOrderBy());
+            if ($limit)
+                $this->_items->limit($limit);
+            if ($offset)
+                $this->_items->offset($offset);
         }
         return $this->_items;
     }
 
     function getItemCount() {
-        return DynamicListItem::count(array('list_id'=>$this->get('id')));
+        return DynamicListItem::objects()->filter(array('list_id'=>$this->id))
+            ->count();
     }
 
     function save() {
@@ -547,11 +540,22 @@ class DynamicList extends VerySimpleModel {
     }
 
     static function create($ht=false) {
-        $inst = parent::create(get_class(), $ht);
+        $inst = parent::create($ht);
         $inst->set('created', new SqlFunction('NOW'));
         return $inst;
     }
+
+    static function getSelections() {
+        $selections = array();
+        foreach (DynamicList::objects() as $list) {
+            $selections['list-'.$list->id] =
+                array('Selection: ' .  $list->getPluralName(),
+                    SelectionField, $list->get('id'));
+        }
+        return $selections;
+    }
 }
+FormField::addFieldTypes(array(DynamicList, 'getSelections'));
 
 /**
  * Represents a single item in a dynamic list
@@ -609,10 +613,13 @@ class SelectionField extends FormField {
     }
 
     function to_php($id) {
+        if (!$id)
+            return null;
+        list($id, $value) = explode(':', $id);
         $item = DynamicListItem::lookup($id);
         # Attempt item lookup by name too
         if (!$item) {
-            $item = DynamicListItem::objects->filter(array(
+            $item = DynamicListItem::objects()->filter(array(
                         'value'=>$id,
                         'list_id'=>$this->getList()->get('id')));
             $item = (count($item)) ? $item[0] : null;
@@ -622,7 +629,7 @@ class SelectionField extends FormField {
 
     function to_database($item) {
         if ($item && $item->get('id'))
-            return $item->get('id');
+            return $item->id . ':' . $item->value;
         return null;
     }
 
@@ -644,25 +651,29 @@ class SelectionField extends FormField {
 class SelectionWidget extends ChoicesWidget {
     function render() {
         $config = $this->field->getConfiguration();
-        if (!$config['typeahead'])
-            return parent::render();
-
-        $source = array(); $value = false;
-        foreach ($this->field->getList()->getItems() as $i)
-            $source[] = array(
-                'info' => $i->get('value'),
-                'value' => strtolower($i->get('value').' '.$i->get('extra')),
-                'id' => $i->get('id'));
+        $value = false;
         if ($this->value && get_class($this->value) == 'DynamicListItem') {
             // Loaded from database
             $value = $this->value->get('id');
             $name = $this->value->get('value');
-        } else {
+        } elseif ($this->value) {
             // Loaded from POST
             $value = $this->value;
             $name = DynamicListItem::lookup($this->value);
             $name = ($name) ? $name->get('value') : null;
         }
+
+        if (!$config['typeahead']) {
+            $this->value = $value;
+            return parent::render();
+        }
+
+        $source = array();
+        foreach ($this->field->getList()->getItems() as $i)
+            $source[] = array(
+                'info' => $i->get('value'),
+                'value' => strtolower($i->get('value').' '.$i->get('extra')),
+                'id' => $i->get('id'));
         ?>
         <span style="display:inline-block">
         <input type="hidden" name="<?php echo $this->name; ?>"
@@ -693,18 +704,5 @@ class SelectionWidget extends ChoicesWidget {
         return $this->_choices;
     }
 }
-
-$a = DynamicFormSet::objects()->filter(array('name'=>'default'))
-    ->filter(array('id__gt'=>3), array('id__lt'=>1))->order_by('name');
-
-$start = microtime(true);
-for ($i=0; $i<10000; $i++) {
-    $b = DynamicListItem::objects()
-        ->filter(array('list__name'=>'bubba'))
-        ->values('id', 'list__id');
-}
-var_dump(microtime(true) - $start);
-
-print($b);
 
 ?>

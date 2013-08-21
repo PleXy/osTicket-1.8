@@ -62,14 +62,17 @@ class FormField {
         'configuration' => array(),
     );
 
-    static $_types = array(
-            'text'  => array('Short Answer', TextboxField),
-            'memo' => array('Long Answer', TextareaField),
-            'datetime' => array('Date and Time', DatetimeField),
-            'phone' => array('Phone Number', PhoneField),
-            'bool' => array('Checkbox', BooleanField),
-            'choices' => array('Choices', ChoiceField),
-        );
+    var $_cform;
+
+    static $types = array(
+        'text'  => array('Short Answer', TextboxField),
+        'memo' => array('Long Answer', TextareaField),
+        'datetime' => array('Date and Time', DatetimeField),
+        'phone' => array('Phone Number', PhoneField),
+        'bool' => array('Checkbox', BooleanField),
+        'choices' => array('Choices', ChoiceField),
+    );
+    static $more_types = array();
 
     function FormField() {
         call_user_func_array(array($this, '__construct'), func_get_args());
@@ -79,6 +82,20 @@ class FormField {
         $this->ht = array_merge($this->ht, $options);
         if (!isset($this->ht['id']))
             $this->ht['id'] = $uid++;
+    }
+
+    static function addFieldTypes($callable) {
+        static::$more_types[] = $callable;
+    }
+
+    static function allTypes() {
+        if (static::$more_types) {
+            foreach (static::$more_types as $c)
+                static::$types = array_merge(static::$types,
+                    call_user_func($c));
+            static::$more_types = array();
+        }
+        return static::$types;
     }
 
     function get($what) {
@@ -207,15 +224,16 @@ class FormField {
      * instance will be returned.
      */
     function getImpl() {
-        $type = get_dynamic_field_types();
-        $clazz = $type[$this->get('type')][1];
+        // Allow registration with ::addFieldTypes and delayed calling
+        $types = static::allTypes();
+        $clazz = $types[$this->get('type')][1];
         return new $clazz($this->ht);
     }
 
     function getAnswer() { return $this->answer; }
 
     function getFormName() {
-        return ':field-id-'.$this->get('id');
+        return '-field-id-'.$this->get('id');
     }
 
     function render() {
@@ -236,8 +254,33 @@ class FormField {
      * the default value will be reflected in the returned configuration.
      */
     function getConfiguration() {
-        return $this->get('configuration');
+        if (!$this->_config) {
+            $this->_config = $this->get('configuration');
+            if (is_string($this->_config))
+                $this->_config = JsonDataParser::parse($this->_config);
+            elseif (!$this->_config)
+                $this->_config = array();
+            foreach ($this->getConfigurationOptions() as $name=>$field)
+                if (!isset($this->_config[$name]))
+                    $this->_config[$name] = $field->get('default');
+        }
+        return $this->_config;
     }
+
+    function isConfigurable() {
+        return true;
+    }
+
+    function getConfigurationForm() {
+        if (!$this->_cform) {
+            $types = static::allTypes();
+            $clazz = $types[$this->get('type')][1];
+            $T = new $clazz();
+            $this->_cform = $T->getConfigurationOptions();
+        }
+        return $this->_cform;
+    }
+
 }
 
 class TextboxField extends FormField {
@@ -438,13 +481,6 @@ class DatetimeField extends FormField {
         elseif ($value === -1 or $value === false)
             $this->_errors[] = 'Enter a valid date';
     }
-}
-
-function get_dynamic_field_types() {
-    static $types = false;
-    if (!$types) {
-    }
-    return $types;
 }
 
 class Widget {
