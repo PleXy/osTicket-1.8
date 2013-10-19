@@ -20,6 +20,7 @@
 
 require_once(INCLUDE_DIR.'class.csrf.php'); //CSRF token class.
 require_once(INCLUDE_DIR.'class.migrater.php');
+require_once(INCLUDE_DIR.'class.plugin.php');
 
 define('LOG_WARN',LOG_WARNING);
 
@@ -46,6 +47,8 @@ class osTicket {
     var $session;
     var $csrf;
 
+    var $plugins;
+
     function osTicket() {
 
         require_once(INCLUDE_DIR.'class.config.php'); //Config helper
@@ -55,6 +58,8 @@ class osTicket {
         $this->config = new OsticketConfig();
 
         $this->csrf = new CSRF('__CSRFToken__');
+
+        $this->plugins = new PluginManager();
     }
 
     function isSystemOnline() {
@@ -424,6 +429,9 @@ class osTicket {
         //Set default time zone... user/staff settting will override it (on login).
         $_SESSION['TZ_OFFSET'] = $ost->getConfig()->getTZoffset();
         $_SESSION['TZ_DST'] = $ost->getConfig()->observeDaylightSaving();
+
+        // Bootstrap installed plugins
+        $ost->plugins->bootstrap();
 
         return $ost;
     }

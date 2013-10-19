@@ -37,15 +37,37 @@ class UsersAjaxAPI extends AjaxController {
             .' WHERE email.address LIKE \'%'.db_input(strtolower($_REQUEST['q']), false).'%\' '
             .' ORDER BY created '
             .' LIMIT '.$limit;
-           
+
         if(($res=db_query($sql)) && db_num_rows($res)){
             while(list($email,$name)=db_fetch_row($res)) {
                 $users[] = array('email'=>$email, 'name'=>$name, 'info'=>"$email - $name");
-            }                    
-        }  
-        
+            }
+        }
+
         return $this->json_encode($users);
 
+    }
+
+    function searchStaff() {
+        global $thisstaff;
+
+        if (!$thisstaff)
+            Http::response(403, 'Login required for searching');
+        elseif (!$thisstaff->isAdmin())
+            Http::response(403,
+                'Administrative privilege is required for searching');
+        elseif (!isset($_REQUEST['q']))
+            Http::response(400, 'Query argument is required');
+
+        $users = array();
+        foreach (AuthenticationBackend::allRegistered() as $ab) {
+            if (!$ab->supportsSearch())
+                continue;
+
+            foreach ($ab->search($_REQUEST['q']) as $u)
+                $users[] = $u;
+        }
+        return $this->json_encode($users);
     }
 }
 ?>

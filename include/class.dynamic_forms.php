@@ -668,7 +668,7 @@ class DynamicList extends VerySimpleModel {
         return $selections;
     }
 }
-FormField::addFieldTypes('Custom Lists', array(DynamicList, 'getSelections'));
+FormField::addFieldTypes('Custom Lists', array('DynamicList', 'getSelections'));
 
 /**
  * Represents a single item in a dynamic list
